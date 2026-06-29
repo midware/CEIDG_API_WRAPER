@@ -176,6 +176,15 @@ public sealed class CeidgInitialImportService(
                             {
                                 skippedThisRun++;
                                 skippedTotal++;
+                                logger.LogInformation(
+                                    "Skipping existing CEIDG company {CompanyId} from {WindowFrom}..{WindowTo} page {Page} item {ItemIndex}/{ItemCount}. SkippedTotal={SkippedTotal}.",
+                                    companyId,
+                                    windowFrom,
+                                    windowTo,
+                                    page,
+                                    itemIndex + 1,
+                                    companyIds.Count,
+                                    skippedTotal);
                                 await SaveChangesCheckpointAsync(
                                     checkpointKey,
                                     importKind,
@@ -191,6 +200,15 @@ public sealed class CeidgInitialImportService(
                                     cancellationToken);
                                 continue;
                             }
+
+                            logger.LogInformation(
+                                "Requesting CEIDG /firma/{CompanyId} from {WindowFrom}..{WindowTo} page {Page} item {ItemIndex}/{ItemCount}.",
+                                companyId,
+                                windowFrom,
+                                windowTo,
+                                page,
+                                itemIndex + 1,
+                                companyIds.Count);
 
                             var detailResponse = await ceidgClient.GetCompanyByIdAsync(companyId, cancellationToken);
                             if (detailResponse.StatusCode == HttpStatusCode.NoContent)
@@ -213,6 +231,11 @@ public sealed class CeidgInitialImportService(
                                 await store.UpsertCompanyAsync(new CompanyIndexItem(companyId, null, null, null, "{}"), detailResponse, importRunId, cancellationToken);
                                 importedThisRun++;
                                 importedTotal++;
+                                logger.LogInformation(
+                                    "Imported CEIDG company {CompanyId}. ImportedThisRun={ImportedThisRun}, ImportedTotal={ImportedTotal}.",
+                                    companyId,
+                                    importedThisRun,
+                                    importedTotal);
                             }
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
