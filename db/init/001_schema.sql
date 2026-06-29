@@ -1,6 +1,5 @@
 create schema if not exists source;
 create schema if not exists ceidg;
-create schema if not exists app;
 
 create table if not exists source.import_run (
     id uuid primary key,
@@ -150,4 +149,5 @@ create index if not exists ix_report_company_link_company_record_id on source.re
 create index if not exists ix_report_company_link_nip on source.report_company_link (nip);
 create index if not exists ix_report_company_link_regon on source.report_company_link (regon);
 create index if not exists ix_report_company_link_ceidg_id on source.report_company_link (ceidg_id);
+
 
