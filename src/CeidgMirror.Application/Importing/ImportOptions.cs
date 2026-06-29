@@ -6,7 +6,9 @@ public sealed class ImportOptions
 
     public bool Enabled { get; init; }
     public bool RunOnce { get; init; } = true;
-    public string Source { get; init; } = "ReportRepository";
+    public string Source { get; init; } = "ChangesApi";
+    public DateOnly ChangesFrom { get; init; } = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+    public DateOnly? ChangesTo { get; init; }
     public int StartPage { get; init; } = 1;
     public int PageLimit { get; init; } = 50;
     public int MaxPages { get; init; } = 1;

@@ -48,9 +48,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
     {
         var detailJson = detailResponse.Content;
         using var document = JsonDocument.Parse(detailJson);
-        var firma = TryGetProperty(document.RootElement, "firma", out var firmaElement)
-            ? firmaElement
-            : document.RootElement;
+        var firma = ExtractFirmaElement(document.RootElement);
 
         var ceidgId = ReadString(firma, "id") ?? indexItem?.CeidgId ?? ReadString(firma, "link") ?? throw new InvalidOperationException("CEIDG detail payload does not contain id or link.");
         var owner = TryGetProperty(firma, "wlasciciel", out var ownerElement) ? ownerElement : default;
@@ -255,7 +253,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, ReadString(address, "terc"));
         Add(command, ReadString(address, "simc"));
         Add(command, ReadString(address, "ulic"));
-        Add(command, ReadString(firma, "pkdGlowny"));
+        Add(command, ReadPkdCode(firma, "pkdGlowny"));
         AddJson(command, ReadRaw(firma, "obywatelstwo") ?? ReadRaw(firma, "obywatelstwa"));
         AddJson(command, ReadRaw(firma, "podstawyPrawneWykreslenia"));
         AddJson(command, ReadRaw(firma, "adresKorespondencyjny"));
@@ -332,6 +330,25 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+    private static JsonElement ExtractFirmaElement(JsonElement root)
+    {
+        if (!TryGetProperty(root, "firma", out var firmaElement))
+        {
+            return root;
+        }
+
+        if (firmaElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in firmaElement.EnumerateArray())
+            {
+                return item;
+            }
+
+            throw new InvalidOperationException("CEIDG detail payload contains an empty firma array.");
+        }
+
+        return firmaElement;
+    }
     private static void Add(NpgsqlCommand command, object? value) => command.Parameters.AddWithValue(value ?? DBNull.Value);
 
     private static void AddJson(NpgsqlCommand command, string? json)
@@ -346,6 +363,20 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    private static string? ReadPkdCode(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Object && TryGetProperty(value, "kod", out var code))
+        {
+            return code.ValueKind == JsonValueKind.String ? code.GetString() : code.ToString();
+        }
+
+        return value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
+    }
     private static string? ReadString(JsonElement element, string propertyName)
     {
         if (!TryGetProperty(element, propertyName, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)

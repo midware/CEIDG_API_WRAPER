@@ -22,15 +22,129 @@ public sealed class CeidgInitialImportService(
             return;
         }
 
+        if (string.Equals(options.Source, "ReportRepository", StringComparison.OrdinalIgnoreCase))
+        {
+            await RunReportRepositoryImportAsync(cancellationToken);
+            return;
+        }
+
         if (string.Equals(options.Source, "RestApi", StringComparison.OrdinalIgnoreCase))
         {
             await RunRestIndexDetailImportAsync(cancellationToken);
             return;
         }
 
-        await RunReportRepositoryImportAsync(cancellationToken);
+        await RunChangesImportAsync(cancellationToken);
     }
 
+    private async Task RunChangesImportAsync(CancellationToken cancellationToken)
+    {
+        var importRunId = await store.StartImportRunAsync("changes-detail", cancellationToken);
+        var imported = 0;
+        var failed = 0;
+        var pagesRead = 0;
+        var discovered = 0;
+        var shouldStop = false;
+        string? lastFailure = null;
+
+        try
+        {
+            for (var page = options.StartPage; !shouldStop; page++)
+            {
+                if (options.MaxPages > 0 && pagesRead >= options.MaxPages)
+                {
+                    break;
+                }
+
+                var changesResponse = await ceidgClient.GetChangesAsync(
+                    options.ChangesFrom,
+                    options.ChangesTo,
+                    page,
+                    options.PageLimit,
+                    cancellationToken);
+
+                pagesRead++;
+
+                if (changesResponse.StatusCode == HttpStatusCode.NoContent)
+                {
+                    logger.LogInformation("CEIDG /zmiana returned 204 on page {Page}. Import page loop ended.", page);
+                    break;
+                }
+
+                if (!changesResponse.IsSuccess)
+                {
+                    lastFailure = $"CEIDG /zmiana failed with status {(int)changesResponse.StatusCode} on page {page}. Body: {Truncate(changesResponse.Content, 500)}";
+                    logger.LogError("{Failure}", lastFailure);
+                    throw new InvalidOperationException(lastFailure);
+                }
+
+                var companyIds = CeidgZmianaResponseParser.ParseCompanyIds(changesResponse.Content);
+                discovered += companyIds.Count;
+                if (companyIds.Count == 0)
+                {
+                    logger.LogInformation("CEIDG /zmiana returned no ids on page {Page}. Import page loop ended.", page);
+                    break;
+                }
+
+                logger.LogInformation("CEIDG /zmiana page {Page} returned {Count} company ids.", page, companyIds.Count);
+
+                foreach (var companyId in companyIds)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (options.MaxCompanies > 0 && imported >= options.MaxCompanies)
+                    {
+                        shouldStop = true;
+                        break;
+                    }
+
+                    try
+                    {
+                        var detailResponse = await ceidgClient.GetCompanyByIdAsync(companyId, cancellationToken);
+                        if (detailResponse.StatusCode == HttpStatusCode.NoContent)
+                        {
+                            logger.LogWarning("CEIDG /firma/{CompanyId} returned 204.", companyId);
+                            continue;
+                        }
+
+                        if (!detailResponse.IsSuccess)
+                        {
+                            failed++;
+                            lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for id {companyId}. Body: {Truncate(detailResponse.Content, 500)}";
+                            logger.LogWarning("{Failure}", lastFailure);
+                            continue;
+                        }
+
+                        await store.UpsertCompanyAsync(new CompanyIndexItem(companyId, null, null, null, "{}"), detailResponse, importRunId, cancellationToken);
+                        imported++;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        failed++;
+                        lastFailure = ex.Message;
+                        logger.LogError(ex, "Failed to import CEIDG company id {CompanyId}.", companyId);
+                    }
+                }
+            }
+
+            await store.CompleteImportRunAsync(
+                importRunId,
+                "completed",
+                new { imported, failed, discovered, pagesRead, lastFailure, options.ChangesFrom, options.ChangesTo, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                cancellationToken);
+
+            logger.LogInformation("CEIDG changes import completed. Imported={Imported}, Failed={Failed}, Discovered={Discovered}, PagesRead={PagesRead}.", imported, failed, discovered, pagesRead);
+        }
+        catch
+        {
+            await store.CompleteImportRunAsync(
+                importRunId,
+                "failed",
+                new { imported, failed, discovered, pagesRead, lastFailure, options.ChangesFrom, options.ChangesTo, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                CancellationToken.None);
+            throw;
+        }
+    }
     private async Task RunReportRepositoryImportAsync(CancellationToken cancellationToken)
     {
         var importRunId = await store.StartImportRunAsync("report-repository", cancellationToken);
