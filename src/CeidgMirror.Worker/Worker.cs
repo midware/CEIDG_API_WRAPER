@@ -11,13 +11,16 @@ public class Worker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "CEIDG mirror worker started. ImportEnabled={ImportEnabled}, RunOnce={RunOnce}, StartPage={StartPage}, PageLimit={PageLimit}, MaxPages={MaxPages}, MaxCompanies={MaxCompanies}",
+            "CEIDG mirror worker started. ImportEnabled={ImportEnabled}, RunOnce={RunOnce}, Source={Source}, StartPage={StartPage}, PageLimit={PageLimit}, MaxPages={MaxPages}, MaxCompanies={MaxCompanies}, Resume={Resume}, SkipExistingCompanies={SkipExistingCompanies}",
             importOptions.Enabled,
             importOptions.RunOnce,
+            importOptions.Source,
             importOptions.StartPage,
             importOptions.PageLimit,
             importOptions.MaxPages,
-            importOptions.MaxCompanies);
+            importOptions.MaxCompanies,
+            importOptions.Resume,
+            importOptions.SkipExistingCompanies);
 
         if (importOptions.RunOnce)
         {
@@ -36,8 +39,23 @@ public class Worker(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await importService.RunInitialImportAsync(stoppingToken);
-            await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
+            try
+            {
+                await importService.RunInitialImportAsync(stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(importOptions.LoopDelayMinutes), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "CEIDG mirror worker loop failed. It will retry from the saved checkpoint in {DelayMinutes} minutes.",
+                    importOptions.FailureRetryDelayMinutes);
+                await Task.Delay(TimeSpan.FromMinutes(importOptions.FailureRetryDelayMinutes), stoppingToken);
+            }
         }
     }
 }

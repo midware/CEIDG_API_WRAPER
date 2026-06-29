@@ -39,20 +39,45 @@ public sealed class CeidgInitialImportService(
 
     private async Task RunChangesImportAsync(CancellationToken cancellationToken)
     {
-        var importRunId = await store.StartImportRunAsync("changes-detail", cancellationToken);
-        var imported = 0;
-        var failed = 0;
-        var pagesRead = 0;
-        var discovered = 0;
+        const string importKind = "changes-detail";
+        var checkpointKey = BuildCheckpointKey(importKind);
+        var checkpoint = options.Resume
+            ? await store.GetCheckpointAsync(checkpointKey, cancellationToken)
+            : null;
+
+        if (checkpoint?.Completed == true)
+        {
+            logger.LogInformation(
+                "CEIDG changes import checkpoint {CheckpointKey} is already completed at page {Page}, item {ItemIndex}. Nothing to resume.",
+                checkpoint.CheckpointKey,
+                checkpoint.NextPage,
+                checkpoint.NextItemIndex);
+            return;
+        }
+
+        var importRunId = await store.StartImportRunAsync(importKind, cancellationToken);
+        var importedThisRun = 0;
+        var failedThisRun = 0;
+        var skippedThisRun = 0;
+        var pagesReadThisRun = 0;
+        var discoveredThisRun = 0;
+        var importedTotal = checkpoint?.ImportedCount ?? 0;
+        var skippedTotal = checkpoint?.SkippedCount ?? 0;
+        var failedTotal = checkpoint?.FailedCount ?? 0;
+        var startPage = checkpoint?.NextPage ?? options.StartPage;
+        var startItemIndex = checkpoint?.NextItemIndex ?? 0;
         var shouldStop = false;
+        var completed = false;
         string? lastFailure = null;
+        string? lastCompanyId = checkpoint?.LastCompanyId;
 
         try
         {
-            for (var page = options.StartPage; !shouldStop; page++)
+            for (var page = startPage; !shouldStop; page++)
             {
-                if (options.MaxPages > 0 && pagesRead >= options.MaxPages)
+                if (options.MaxPages > 0 && pagesReadThisRun >= options.MaxPages)
                 {
+                    logger.LogInformation("CEIDG changes import paused after configured MaxPages={MaxPages}.", options.MaxPages);
                     break;
                 }
 
@@ -63,11 +88,23 @@ public sealed class CeidgInitialImportService(
                     options.PageLimit,
                     cancellationToken);
 
-                pagesRead++;
+                pagesReadThisRun++;
 
                 if (changesResponse.StatusCode == HttpStatusCode.NoContent)
                 {
-                    logger.LogInformation("CEIDG /zmiana returned 204 on page {Page}. Import page loop ended.", page);
+                    completed = true;
+                    await SaveChangesCheckpointAsync(
+                        checkpointKey,
+                        importKind,
+                        page,
+                        0,
+                        importedTotal,
+                        skippedTotal,
+                        failedTotal,
+                        completed: true,
+                        lastCompanyId,
+                        cancellationToken);
+                    logger.LogInformation("CEIDG /zmiana returned 204 on page {Page}. Import marked as completed.", page);
                     break;
                 }
 
@@ -79,68 +116,189 @@ public sealed class CeidgInitialImportService(
                 }
 
                 var companyIds = CeidgZmianaResponseParser.ParseCompanyIds(changesResponse.Content);
-                discovered += companyIds.Count;
+                discoveredThisRun += companyIds.Count;
                 if (companyIds.Count == 0)
                 {
-                    logger.LogInformation("CEIDG /zmiana returned no ids on page {Page}. Import page loop ended.", page);
+                    completed = true;
+                    await SaveChangesCheckpointAsync(
+                        checkpointKey,
+                        importKind,
+                        page,
+                        0,
+                        importedTotal,
+                        skippedTotal,
+                        failedTotal,
+                        completed: true,
+                        lastCompanyId,
+                        cancellationToken);
+                    logger.LogInformation("CEIDG /zmiana returned no ids on page {Page}. Import marked as completed.", page);
                     break;
                 }
 
-                logger.LogInformation("CEIDG /zmiana page {Page} returned {Count} company ids.", page, companyIds.Count);
+                var itemStart = page == startPage ? startItemIndex : 0;
+                logger.LogInformation(
+                    "CEIDG /zmiana page {Page} returned {Count} company ids. Starting at item index {ItemIndex}.",
+                    page,
+                    companyIds.Count,
+                    itemStart);
 
-                foreach (var companyId in companyIds)
+                for (var itemIndex = itemStart; itemIndex < companyIds.Count; itemIndex++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (options.MaxCompanies > 0 && imported >= options.MaxCompanies)
+                    if (options.MaxCompanies > 0 && importedThisRun >= options.MaxCompanies)
                     {
                         shouldStop = true;
+                        logger.LogInformation("CEIDG changes import paused after configured MaxCompanies={MaxCompanies}.", options.MaxCompanies);
                         break;
                     }
 
+                    var companyId = companyIds[itemIndex];
+                    lastCompanyId = companyId;
+
                     try
                     {
+                        if (options.SkipExistingCompanies && await store.CompanyExistsAsync(companyId, cancellationToken))
+                        {
+                            skippedThisRun++;
+                            skippedTotal++;
+                            await SaveChangesCheckpointAsync(
+                                checkpointKey,
+                                importKind,
+                                page,
+                                itemIndex + 1,
+                                importedTotal,
+                                skippedTotal,
+                                failedTotal,
+                                completed: false,
+                                lastCompanyId,
+                                cancellationToken);
+                            continue;
+                        }
+
                         var detailResponse = await ceidgClient.GetCompanyByIdAsync(companyId, cancellationToken);
                         if (detailResponse.StatusCode == HttpStatusCode.NoContent)
                         {
-                            logger.LogWarning("CEIDG /firma/{CompanyId} returned 204.", companyId);
-                            continue;
+                            failedThisRun++;
+                            failedTotal++;
+                            lastFailure = $"CEIDG /firma/{companyId} returned 204.";
+                            logger.LogWarning("{Failure}", lastFailure);
                         }
-
-                        if (!detailResponse.IsSuccess)
+                        else if (!detailResponse.IsSuccess)
                         {
-                            failed++;
+                            failedThisRun++;
+                            failedTotal++;
                             lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for id {companyId}. Body: {Truncate(detailResponse.Content, 500)}";
                             logger.LogWarning("{Failure}", lastFailure);
-                            continue;
                         }
-
-                        await store.UpsertCompanyAsync(new CompanyIndexItem(companyId, null, null, null, "{}"), detailResponse, importRunId, cancellationToken);
-                        imported++;
+                        else
+                        {
+                            await store.UpsertCompanyAsync(new CompanyIndexItem(companyId, null, null, null, "{}"), detailResponse, importRunId, cancellationToken);
+                            importedThisRun++;
+                            importedTotal++;
+                        }
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        failed++;
+                        failedThisRun++;
+                        failedTotal++;
                         lastFailure = ex.Message;
                         logger.LogError(ex, "Failed to import CEIDG company id {CompanyId}.", companyId);
                     }
+
+                    await SaveChangesCheckpointAsync(
+                        checkpointKey,
+                        importKind,
+                        page,
+                        itemIndex + 1,
+                        importedTotal,
+                        skippedTotal,
+                        failedTotal,
+                        completed: false,
+                        lastCompanyId,
+                        cancellationToken);
+                }
+
+                if (!shouldStop)
+                {
+                    await SaveChangesCheckpointAsync(
+                        checkpointKey,
+                        importKind,
+                        page + 1,
+                        0,
+                        importedTotal,
+                        skippedTotal,
+                        failedTotal,
+                        completed: false,
+                        lastCompanyId,
+                        cancellationToken);
                 }
             }
 
             await store.CompleteImportRunAsync(
                 importRunId,
-                "completed",
-                new { imported, failed, discovered, pagesRead, lastFailure, options.ChangesFrom, options.ChangesTo, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                completed ? "completed" : "paused",
+                new
+                {
+                    importedThisRun,
+                    skippedThisRun,
+                    failedThisRun,
+                    pagesReadThisRun,
+                    discoveredThisRun,
+                    importedTotal,
+                    skippedTotal,
+                    failedTotal,
+                    completed,
+                    lastFailure,
+                    lastCompanyId,
+                    checkpointKey,
+                    options.ChangesFrom,
+                    options.ChangesTo,
+                    options.StartPage,
+                    options.PageLimit,
+                    options.MaxPages,
+                    options.MaxCompanies,
+                    options.SkipExistingCompanies
+                },
                 cancellationToken);
 
-            logger.LogInformation("CEIDG changes import completed. Imported={Imported}, Failed={Failed}, Discovered={Discovered}, PagesRead={PagesRead}.", imported, failed, discovered, pagesRead);
+            logger.LogInformation(
+                "CEIDG changes import {Status}. ImportedThisRun={Imported}, SkippedThisRun={Skipped}, FailedThisRun={Failed}, ImportedTotal={ImportedTotal}, SkippedTotal={SkippedTotal}, FailedTotal={FailedTotal}.",
+                completed ? "completed" : "paused",
+                importedThisRun,
+                skippedThisRun,
+                failedThisRun,
+                importedTotal,
+                skippedTotal,
+                failedTotal);
         }
         catch
         {
             await store.CompleteImportRunAsync(
                 importRunId,
                 "failed",
-                new { imported, failed, discovered, pagesRead, lastFailure, options.ChangesFrom, options.ChangesTo, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                new
+                {
+                    importedThisRun,
+                    skippedThisRun,
+                    failedThisRun,
+                    pagesReadThisRun,
+                    discoveredThisRun,
+                    importedTotal,
+                    skippedTotal,
+                    failedTotal,
+                    completed,
+                    lastFailure,
+                    lastCompanyId,
+                    checkpointKey,
+                    options.ChangesFrom,
+                    options.ChangesTo,
+                    options.StartPage,
+                    options.PageLimit,
+                    options.MaxPages,
+                    options.MaxCompanies,
+                    options.SkipExistingCompanies
+                },
                 CancellationToken.None);
             throw;
         }
@@ -334,7 +492,51 @@ public sealed class CeidgInitialImportService(
         }
     }
 
-    private bool MatchesReportFilter(CeidgReportDescriptor report)
+
+    private Task SaveChangesCheckpointAsync(
+        string checkpointKey,
+        string importKind,
+        int nextPage,
+        int nextItemIndex,
+        long importedTotal,
+        long skippedTotal,
+        long failedTotal,
+        bool completed,
+        string? lastCompanyId,
+        CancellationToken cancellationToken)
+    {
+        var checkpoint = new ImportCheckpoint(
+            checkpointKey,
+            importKind,
+            options.ChangesFrom,
+            options.ChangesTo,
+            nextPage,
+            nextItemIndex,
+            importedTotal,
+            skippedTotal,
+            failedTotal,
+            completed,
+            lastCompanyId);
+
+        return store.SaveCheckpointAsync(
+            checkpoint,
+            new
+            {
+                options.Source,
+                options.PageLimit,
+                options.MaxPages,
+                options.MaxCompanies,
+                options.SkipExistingCompanies,
+                options.Resume
+            },
+            cancellationToken);
+    }
+
+    private string BuildCheckpointKey(string importKind)
+    {
+        var to = options.ChangesTo?.ToString("yyyyMMdd", CultureInfo.InvariantCulture) ?? "open";
+        return $"{importKind}:{options.ChangesFrom:yyyyMMdd}:{to}:limit-{options.PageLimit}";
+    }    private bool MatchesReportFilter(CeidgReportDescriptor report)
     {
         if (!string.IsNullOrWhiteSpace(options.ReportFileType) &&
             !string.Equals(report.FileType, options.ReportFileType, StringComparison.OrdinalIgnoreCase))

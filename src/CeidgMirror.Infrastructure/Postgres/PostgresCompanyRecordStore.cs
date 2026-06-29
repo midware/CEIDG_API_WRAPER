@@ -40,6 +40,116 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+
+    public async Task<ImportCheckpoint?> GetCheckpointAsync(
+        string checkpointKey,
+        CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand("""
+            select checkpoint_key,
+                   import_kind,
+                   changes_from,
+                   changes_to,
+                   next_page,
+                   next_item_index,
+                   imported_count,
+                   skipped_count,
+                   failed_count,
+                   completed,
+                   last_company_id
+            from source.import_checkpoint
+            where checkpoint_key = $1
+            """);
+        command.Parameters.AddWithValue(checkpointKey);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new ImportCheckpoint(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetFieldValue<DateOnly>(2),
+            reader.IsDBNull(3) ? null : reader.GetFieldValue<DateOnly>(3),
+            reader.GetInt32(4),
+            reader.GetInt32(5),
+            reader.GetInt64(6),
+            reader.GetInt64(7),
+            reader.GetInt64(8),
+            reader.GetBoolean(9),
+            reader.IsDBNull(10) ? null : reader.GetString(10));
+    }
+
+    public async Task SaveCheckpointAsync(
+        ImportCheckpoint checkpoint,
+        object details,
+        CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand("""
+            insert into source.import_checkpoint (
+                checkpoint_key,
+                import_kind,
+                changes_from,
+                changes_to,
+                next_page,
+                next_item_index,
+                imported_count,
+                skipped_count,
+                failed_count,
+                completed,
+                last_company_id,
+                details,
+                updated_at_utc
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, now())
+            on conflict (checkpoint_key) do update set
+                import_kind = excluded.import_kind,
+                changes_from = excluded.changes_from,
+                changes_to = excluded.changes_to,
+                next_page = excluded.next_page,
+                next_item_index = excluded.next_item_index,
+                imported_count = excluded.imported_count,
+                skipped_count = excluded.skipped_count,
+                failed_count = excluded.failed_count,
+                completed = excluded.completed,
+                last_company_id = excluded.last_company_id,
+                details = excluded.details,
+                updated_at_utc = now()
+            """);
+
+        Add(command, checkpoint.CheckpointKey);
+        Add(command, checkpoint.ImportKind);
+        Add(command, checkpoint.ChangesFrom);
+        Add(command, checkpoint.ChangesTo);
+        Add(command, checkpoint.NextPage);
+        Add(command, checkpoint.NextItemIndex);
+        Add(command, checkpoint.ImportedCount);
+        Add(command, checkpoint.SkippedCount);
+        Add(command, checkpoint.FailedCount);
+        Add(command, checkpoint.Completed);
+        Add(command, checkpoint.LastCompanyId);
+        Add(command, JsonSerializer.Serialize(details));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<bool> CompanyExistsAsync(
+        string ceidgId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var command = dataSource.CreateCommand("""
+            select exists (
+                select 1
+                from ceidg.company_records
+                where upper(ceidg_id) = upper($1)
+            )
+            """);
+        command.Parameters.AddWithValue(ceidgId);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is true;
+    }
     public async Task UpsertCompanyAsync(
         CompanyIndexItem? indexItem,
         CeidgRawResponse detailResponse,

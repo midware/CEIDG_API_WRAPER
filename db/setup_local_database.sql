@@ -162,6 +162,21 @@ create index if not exists ix_report_company_link_company_record_id on source.re
 create index if not exists ix_report_company_link_nip on source.report_company_link (nip);
 create index if not exists ix_report_company_link_regon on source.report_company_link (regon);
 create index if not exists ix_report_company_link_ceidg_id on source.report_company_link (ceidg_id);
+create table if not exists source.import_checkpoint (
+    checkpoint_key text primary key,
+    import_kind text not null,
+    changes_from date not null,
+    changes_to date null,
+    next_page integer not null,
+    next_item_index integer not null,
+    imported_count bigint not null default 0,
+    skipped_count bigint not null default 0,
+    failed_count bigint not null default 0,
+    completed boolean not null default false,
+    last_company_id text null,
+    details jsonb not null default '{}'::jsonb,
+    updated_at_utc timestamptz not null
+);
 
-
-
+create index if not exists ix_import_checkpoint_kind_completed
+    on source.import_checkpoint (import_kind, completed);

@@ -61,19 +61,26 @@ The worker does not import automatically by default. Enable it explicitly:
 $env:CeidgApi__JwtToken = "YOUR_TOKEN"
 $env:CeidgApi__BaseUrl = "https://dane.biznes.gov.pl/api/ceidg/v3/"
 $env:Import__Enabled = "true"
-$env:Import__RunOnce = "true"
+$env:Import__RunOnce = "false"
 $env:Import__Source = "ChangesApi"
-$env:Import__ChangesFrom = "2026-06-28"
-$env:Import__MaxPages = "1"
-$env:Import__PageLimit = "1"
-$env:Import__MaxCompanies = "1"
+$env:Import__ChangesFrom = "2011-07-01"
+$env:Import__MaxPages = "0"
+$env:Import__PageLimit = "50"
+$env:Import__MaxCompanies = "0"
 $env:Postgres__ConnectionString = "Host=localhost;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
 dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 ```
 
 The primary importer reads company ids from `/zmiana`, then fetches full company details from `/firma/{id}`, and finally upserts one row into `ceidg.company_records` with the full `raw_detail_payload`. The older `/firmy` index flow remains available as `Import__Source=RestApi`, but the live production service currently works through the v3 change/detail flow.
 
-API pacing is enforced with both CEIDG documented windows: 50 requests per 180 seconds and 1000 requests per 3600 seconds.
+For a full mirror, keep `MaxPages=0` and `MaxCompanies=0`. Progress is persisted in `source.import_checkpoint` after each processed company. If the worker is stopped or crashes, the next run resumes from `next_page` and `next_item_index` instead of starting from page 1. With `SkipExistingCompanies=true`, already imported CEIDG ids are skipped without calling `/firma/{id}` again.
+
+Request pacing is centralized in `SlidingWindowRequestPacer`:
+
+- CEIDG hard windows: 50 requests / 180 seconds and 1000 requests / 3600 seconds.
+- Smooth pacing: `CeidgApi__MinimumRequestIntervalSeconds=4.0`, which keeps the worker below both limits instead of bursting requests.
+- Slow historical pages are allowed by `CeidgApi__RequestTimeoutSeconds=300`.
+
 
 ## CEIDG Configuration
 

@@ -11,9 +11,10 @@ internal static class CeidgServiceRegistration
 
         services.AddSingleton(options);
         services.AddSingleton(new SlidingWindowRequestPacer(
+            TimeSpan.FromSeconds(options.MinimumRequestIntervalSeconds),
             new SlidingWindowRequestPacer.Window(options.RequestLimit, TimeSpan.FromSeconds(options.WindowSeconds)),
             new SlidingWindowRequestPacer.Window(options.HourlyRequestLimit, TimeSpan.FromSeconds(options.HourlyWindowSeconds))));
-        services.AddSingleton<HttpClient>();
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(options.RequestTimeoutSeconds) });
         services.AddSingleton<ICeidgClient, CeidgClient>();
 
         return services;

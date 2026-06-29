@@ -11,4 +11,6 @@ public sealed class CeidgApiOptions
     public int WindowSeconds { get; init; } = 180;
     public int HourlyRequestLimit { get; init; } = 1000;
     public int HourlyWindowSeconds { get; init; } = 3600;
+    public double MinimumRequestIntervalSeconds { get; init; } = 4.0;
+    public int RequestTimeoutSeconds { get; init; } = 300;
 }

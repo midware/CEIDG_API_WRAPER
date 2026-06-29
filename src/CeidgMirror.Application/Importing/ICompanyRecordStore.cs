@@ -12,6 +12,19 @@ public interface ICompanyRecordStore
         object details,
         CancellationToken cancellationToken = default);
 
+    Task<ImportCheckpoint?> GetCheckpointAsync(
+        string checkpointKey,
+        CancellationToken cancellationToken = default);
+
+    Task SaveCheckpointAsync(
+        ImportCheckpoint checkpoint,
+        object details,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> CompanyExistsAsync(
+        string ceidgId,
+        CancellationToken cancellationToken = default);
+
     Task UpsertCompanyAsync(
         CompanyIndexItem? indexItem,
         CeidgRawResponse detailResponse,

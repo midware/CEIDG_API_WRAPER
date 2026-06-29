@@ -1,9 +1,10 @@
 namespace CeidgMirror.Infrastructure.Ceidg;
 
-public sealed class SlidingWindowRequestPacer(params SlidingWindowRequestPacer.Window[] windows)
+public sealed class SlidingWindowRequestPacer(TimeSpan minimumInterval, params SlidingWindowRequestPacer.Window[] windows)
 {
     private readonly WindowState[] _windows = windows.Select(window => new WindowState(window)).ToArray();
     private readonly SemaphoreSlim _mutex = new(1, 1);
+    private DateTimeOffset? _lastRequestAt;
 
     public async Task WaitForSlotAsync(CancellationToken cancellationToken)
     {
@@ -15,6 +16,11 @@ public sealed class SlidingWindowRequestPacer(params SlidingWindowRequestPacer.W
             try
             {
                 var now = DateTimeOffset.UtcNow;
+
+                if (_lastRequestAt is not null && minimumInterval > TimeSpan.Zero)
+                {
+                    waitFor = Max(waitFor, minimumInterval - (now - _lastRequestAt.Value));
+                }
 
                 foreach (var window in _windows)
                 {
@@ -32,6 +38,7 @@ public sealed class SlidingWindowRequestPacer(params SlidingWindowRequestPacer.W
                         window.Register(now);
                     }
 
+                    _lastRequestAt = now;
                     return;
                 }
             }

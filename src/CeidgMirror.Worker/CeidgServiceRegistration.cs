@@ -19,9 +19,10 @@ internal static class CeidgServiceRegistration
         services.AddSingleton(importOptions);
         services.AddSingleton(postgresOptions);
         services.AddSingleton(new SlidingWindowRequestPacer(
+            TimeSpan.FromSeconds(ceidgOptions.MinimumRequestIntervalSeconds),
             new SlidingWindowRequestPacer.Window(ceidgOptions.RequestLimit, TimeSpan.FromSeconds(ceidgOptions.WindowSeconds)),
             new SlidingWindowRequestPacer.Window(ceidgOptions.HourlyRequestLimit, TimeSpan.FromSeconds(ceidgOptions.HourlyWindowSeconds))));
-        services.AddSingleton<HttpClient>();
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(ceidgOptions.RequestTimeoutSeconds) });
         services.AddSingleton<ICeidgClient, CeidgClient>();
         services.AddSingleton(_ => NpgsqlDataSource.Create(postgresOptions.ConnectionString));
         services.AddSingleton<ICompanyRecordStore, PostgresCompanyRecordStore>();
