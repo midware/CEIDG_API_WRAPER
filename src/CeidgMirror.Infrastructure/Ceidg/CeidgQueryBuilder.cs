@@ -24,6 +24,17 @@ public static class CeidgQueryBuilder
         return BuildUri(baseUrl, "firmy", builder.ToString());
     }
 
+    public static Uri BuildCompanyDetailsUri(Uri baseUrl, CeidgCompanyDetailRequest request)
+    {
+        request.Validate();
+
+        var builder = new QueryStringBuilder();
+        builder.Add("nip", request.Nip);
+        builder.Add("regon", request.Regon);
+
+        return BuildUri(baseUrl, "firma", builder.ToString());
+    }
+
     public static Uri BuildCompanyByIdUri(Uri baseUrl, string id)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);

@@ -8,6 +8,10 @@ public interface ICeidgClient
         CeidgFirmySearchRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<CeidgRawResponse> GetCompanyDetailsAsync(
+        CeidgCompanyDetailRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<CeidgRawResponse> GetCompanyByIdAsync(
         string id,
         CancellationToken cancellationToken = default);

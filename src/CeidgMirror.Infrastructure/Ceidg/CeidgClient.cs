@@ -17,6 +17,14 @@ public sealed class CeidgClient(
         return SendAsync(uri, cancellationToken);
     }
 
+    public Task<CeidgRawResponse> GetCompanyDetailsAsync(
+        CeidgCompanyDetailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var uri = CeidgQueryBuilder.BuildCompanyDetailsUri(options.BaseUrl, request);
+        return SendAsync(uri, cancellationToken);
+    }
+
     public Task<CeidgRawResponse> GetCompanyByIdAsync(
         string id,
         CancellationToken cancellationToken = default)

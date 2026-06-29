@@ -18,8 +18,8 @@ Primary integration target:
 
 Important API v2 methods from the documentation:
 
-- `GET /firmy` returns a paginated list of companies matching filters such as NIP, REGON, owner name, company name, address, PKD, date range, and status.
-- `GET /firma` or `GET /firma/{id}` returns detailed company data.
+- `GET /firmy` returns only a paginated search/index view of companies matching filters such as NIP, REGON, owner name, company name, address, PKD, date range, and status. It is not a full company record.
+- `GET /firma?nip=...`, `GET /firma?regon=...`, or `GET /firma/{id}` returns detailed company data. This detail call is required for fields such as phone, email, website, full PKD list, main PKD, restrictions, qualifications, licenses, insolvency, and succession sections.
 - `GET /raporty` returns available reports.
 - `GET /raport/{id}` returns a selected report.
 - `GET /zmiana` returns a paginated list of company identifiers changed in a date range.
@@ -126,7 +126,7 @@ Phase 2: Full initial load
   - date ranges,
   - statuses,
   - possibly PKD/address partitions only if needed.
-- For each listed company id, fetch detailed `/firma/{id}`.
+- For each listed company/NIP from `/firmy` or `/zmiana`, fetch detailed `/firma?nip=...` or `/firma/{id}` before treating the record as complete. The importer must never persist the `/firmy` response alone as the canonical company snapshot.
 - Run with a global distributed rate limiter set below the documented API ceilings.
 
 Phase 3: Incremental synchronization
@@ -195,8 +195,8 @@ Milestone 2: Database foundation
 
 Milestone 3: Initial importer
 
-- Implement paginated `/firmy` import.
-- Implement detail hydration through `/firma/{id}`.
+- Implement paginated `/firmy` index import.
+- Implement mandatory detail hydration through `/firma?nip=...` or `/firma/{id}` for every discovered company, including website, phone, email, PKD list, and main PKD.
 - Persist raw and normalized records transactionally.
 - Add idempotent upserts and payload hashing.
 
@@ -220,7 +220,8 @@ Start with a small proof of concept:
 1. Create the .NET solution skeleton.
 2. Add PostgreSQL Docker Compose.
 3. Add a CEIDG API client with JWT configuration and a conservative rate limiter.
-4. Fetch one page from `/firmy` and one detail record from `/firma/{id}` in the test environment.
+4. Fetch one page from `/firmy`, extract NIP/id values, then fetch detail records from `/firma?nip=...` or `/firma/{id}` in the test environment.
 5. Persist both raw JSON and the first normalized company row.
 
 This validates the most important unknowns before we commit to a large import design.
+

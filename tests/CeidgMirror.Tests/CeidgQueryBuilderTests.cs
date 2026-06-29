@@ -26,6 +26,27 @@ public sealed class CeidgQueryBuilderTests
     }
 
     [Fact]
+    public void BuildCompanyDetailsUri_UsesFirmaEndpointForFullDataByNip()
+    {
+        var uri = CeidgQueryBuilder.BuildCompanyDetailsUri(
+            new Uri("https://test-dane.biznes.gov.pl/api/ceidg/v2/"),
+            new CeidgCompanyDetailRequest { Nip = "2367852376" });
+
+        Assert.Equal(
+            "https://test-dane.biznes.gov.pl/api/ceidg/v2/firma?nip=2367852376",
+            uri.ToString());
+    }
+
+    [Fact]
+    public void BuildCompanyDetailsUri_RequiresNipOrRegon()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            CeidgQueryBuilder.BuildCompanyDetailsUri(
+                new Uri("https://test-dane.biznes.gov.pl/api/ceidg/v2/"),
+                new CeidgCompanyDetailRequest()));
+    }
+
+    [Fact]
     public void BuildChangesUri_UsesDateRangeAndPaging()
     {
         var uri = CeidgQueryBuilder.BuildChangesUri(
