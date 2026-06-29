@@ -44,6 +44,15 @@ docker compose up -d postgres
 
 The development database is created as `ceidg_mirror` with initial schemas from `db/init/001_schema.sql`.
 
+For a local PostgreSQL instance that already exists on Windows, run:
+
+```powershell
+$env:PGPASSWORD = "postgres"
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f db\setup_local_database.sql
+```
+
+Use `-p 5433` for the second local PostgreSQL instance if needed.
+
 ## CEIDG Configuration
 
 Set the JWT outside source control, for example:
@@ -58,6 +67,7 @@ The current default base URL points to the CEIDG test environment.
 
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
+
 
 
 
