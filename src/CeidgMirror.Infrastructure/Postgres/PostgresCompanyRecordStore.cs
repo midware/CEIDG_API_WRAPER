@@ -273,6 +273,65 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task UpsertReportPayloadAsync(
+        CeidgReportDescriptor report,
+        CeidgRawResponse payloadResponse,
+        Guid importRunId,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            report = new
+            {
+                report.GeneratedReportId,
+                report.ReportName,
+                report.ReportDescription,
+                report.ReportParameters,
+                report.FileType,
+                report.GeneratedOn,
+                report.GeneratedOnOnlyDate,
+                report.RawJson
+            },
+            download = new
+            {
+                payloadResponse.ContentType,
+                payloadResponse.Content,
+                payloadResponse.FetchedAtUtc
+            }
+        });
+
+        await using var command = dataSource.CreateCommand("""
+            insert into source.report_payload (
+                id,
+                ceidg_report_id,
+                request_uri,
+                status_code,
+                content_hash,
+                payload,
+                fetched_at_utc,
+                import_run_id
+            )
+            values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+            on conflict (ceidg_report_id) do update set
+                request_uri = excluded.request_uri,
+                status_code = excluded.status_code,
+                content_hash = excluded.content_hash,
+                payload = excluded.payload,
+                fetched_at_utc = excluded.fetched_at_utc,
+                import_run_id = excluded.import_run_id
+            """);
+
+        Add(command, Guid.NewGuid());
+        Add(command, report.GeneratedReportId);
+        Add(command, payloadResponse.RequestUri.ToString());
+        Add(command, (int)payloadResponse.StatusCode);
+        Add(command, Sha256(payloadResponse.Content));
+        AddJson(command, payload);
+        Add(command, payloadResponse.FetchedAtUtc);
+        Add(command, importRunId);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
     private static void Add(NpgsqlCommand command, object? value) => command.Parameters.AddWithValue(value ?? DBNull.Value);
 
     private static void AddJson(NpgsqlCommand command, string? json)
@@ -357,4 +416,3 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         return false;
     }
 }
-

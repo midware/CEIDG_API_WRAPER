@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net;
+using System.Text;
 using CeidgMirror.Application.Abstractions;
 using CeidgMirror.Application.Importing;
 using CeidgMirror.Contracts;
@@ -20,6 +22,99 @@ public sealed class CeidgInitialImportService(
             return;
         }
 
+        if (string.Equals(options.Source, "RestApi", StringComparison.OrdinalIgnoreCase))
+        {
+            await RunRestIndexDetailImportAsync(cancellationToken);
+            return;
+        }
+
+        await RunReportRepositoryImportAsync(cancellationToken);
+    }
+
+    private async Task RunReportRepositoryImportAsync(CancellationToken cancellationToken)
+    {
+        var importRunId = await store.StartImportRunAsync("report-repository", cancellationToken);
+        var downloaded = 0;
+        var failed = 0;
+        var catalogCount = 0;
+        string? lastFailure = null;
+
+        try
+        {
+            var catalogResponse = await ceidgClient.GetReportRepositoryCatalogAsync(cancellationToken);
+            if (!catalogResponse.IsSuccess)
+            {
+                lastFailure = $"CEIDG report catalog failed with status {(int)catalogResponse.StatusCode}. Body: {Truncate(catalogResponse.Content, 500)}";
+                logger.LogError("{Failure}", lastFailure);
+                throw new InvalidOperationException(lastFailure);
+            }
+
+            var reports = CeidgReportRepositoryParser.ParseReports(catalogResponse.Content);
+            catalogCount = reports.Count;
+            var selectedReports = reports
+                .Where(MatchesReportFilter)
+                .OrderByDescending(report => report.GeneratedOn ?? DateTimeOffset.MinValue)
+                .Take(options.MaxReports > 0 ? options.MaxReports : int.MaxValue)
+                .ToArray();
+
+            logger.LogInformation(
+                "CEIDG report catalog returned {CatalogCount} reports. Selected {SelectedCount} reports for download.",
+                catalogCount,
+                selectedReports.Length);
+
+            foreach (var report in selectedReports)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var payloadResponse = await ceidgClient.DownloadReportFromRepositoryAsync(report.GeneratedReportId, cancellationToken: cancellationToken);
+                    if (!payloadResponse.IsSuccess)
+                    {
+                        failed++;
+                        lastFailure = $"CEIDG report download failed with status {(int)payloadResponse.StatusCode} for generatedReportId {report.GeneratedReportId}. Body: {Truncate(payloadResponse.Content, 500)}";
+                        logger.LogWarning("{Failure}", lastFailure);
+                        continue;
+                    }
+
+                    await store.UpsertReportPayloadAsync(report, payloadResponse, importRunId, cancellationToken);
+                    downloaded++;
+                    logger.LogInformation(
+                        "Downloaded CEIDG report {ReportName} ({FileType}) generated at {GeneratedOn}, bytes/chars={Length}.",
+                        report.ReportName,
+                        report.FileType,
+                        report.GeneratedOn,
+                        payloadResponse.Content.Length);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failed++;
+                    lastFailure = ex.Message;
+                    logger.LogError(ex, "Failed to download CEIDG report {GeneratedReportId}.", report.GeneratedReportId);
+                }
+            }
+
+            await store.CompleteImportRunAsync(
+                importRunId,
+                "completed",
+                new { downloaded, failed, catalogCount, lastFailure, options.MaxReports, options.ReportNameContains, options.ReportFileType },
+                cancellationToken);
+
+            logger.LogInformation("CEIDG report import completed. Downloaded={Downloaded}, Failed={Failed}, CatalogCount={CatalogCount}.", downloaded, failed, catalogCount);
+        }
+        catch
+        {
+            await store.CompleteImportRunAsync(
+                importRunId,
+                "failed",
+                new { downloaded, failed, catalogCount, lastFailure, options.MaxReports, options.ReportNameContains, options.ReportFileType },
+                CancellationToken.None);
+            throw;
+        }
+    }
+
+    private async Task RunRestIndexDetailImportAsync(CancellationToken cancellationToken)
+    {
         var importRunId = await store.StartImportRunAsync("initial-index-detail", cancellationToken);
         var imported = 0;
         var failed = 0;
@@ -125,6 +220,52 @@ public sealed class CeidgInitialImportService(
         }
     }
 
+    private bool MatchesReportFilter(CeidgReportDescriptor report)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ReportFileType) &&
+            !string.Equals(report.FileType, options.ReportFileType, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ReportNameContains))
+        {
+            return true;
+        }
+
+        return CultureInfo.InvariantCulture.CompareInfo.IndexOf(
+            RemoveDiacritics(report.ReportName),
+            RemoveDiacritics(options.ReportNameContains),
+            CompareOptions.IgnoreCase) >= 0;
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            if (character == 'ł')
+            {
+                builder.Append('l');
+                continue;
+            }
+
+            if (character == 'Ł')
+            {
+                builder.Append('L');
+                continue;
+            }
+
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC);
+    }
+
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..maxLength];
 
@@ -148,4 +289,3 @@ public sealed class CeidgInitialImportService(
         throw new InvalidOperationException("CEIDG index item does not contain NIP, REGON or CEIDG id.");
     }
 }
-

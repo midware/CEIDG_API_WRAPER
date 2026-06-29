@@ -17,4 +17,10 @@ public interface ICompanyRecordStore
         CeidgRawResponse detailResponse,
         Guid importRunId,
         CancellationToken cancellationToken = default);
+
+    Task UpsertReportPayloadAsync(
+        CeidgReportDescriptor report,
+        CeidgRawResponse payloadResponse,
+        Guid importRunId,
+        CancellationToken cancellationToken = default);
 }

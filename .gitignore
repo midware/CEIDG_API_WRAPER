@@ -21,3 +21,9 @@ secrets.json
 *.sqlite
 *.bak
 pgdata/
+
+# Local CEIDG endpoint diagnostics
+tmp_*.html
+tmp_*.js
+tmp_*.txt
+tmp_cookies.txt
