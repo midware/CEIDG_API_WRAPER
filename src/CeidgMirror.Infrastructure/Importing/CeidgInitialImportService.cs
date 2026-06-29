@@ -25,6 +25,7 @@ public sealed class CeidgInitialImportService(
         var failed = 0;
         var pagesRead = 0;
         var shouldStop = false;
+        string? lastFailure = null;
 
         try
         {
@@ -53,7 +54,9 @@ public sealed class CeidgInitialImportService(
 
                 if (!indexResponse.IsSuccess)
                 {
-                    throw new InvalidOperationException($"CEIDG /firmy failed with status {(int)indexResponse.StatusCode} on page {page}.");
+                    lastFailure = $"CEIDG /firmy failed with status {(int)indexResponse.StatusCode} on page {page}. Body: {Truncate(indexResponse.Content, 500)}";
+                    logger.LogError("{Failure}", lastFailure);
+                    throw new InvalidOperationException(lastFailure);
                 }
 
                 var indexItems = CeidgFirmyResponseParser.ParseCompanies(indexResponse.Content);
@@ -87,12 +90,8 @@ public sealed class CeidgInitialImportService(
                         if (!detailResponse.IsSuccess)
                         {
                             failed++;
-                            logger.LogWarning(
-                                "CEIDG detail failed with status {StatusCode} for CEIDG id {CeidgId}, NIP {Nip}, REGON {Regon}.",
-                                (int)detailResponse.StatusCode,
-                                item.CeidgId,
-                                item.Nip,
-                                item.Regon);
+                            lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for CEIDG id {item.CeidgId}, NIP {item.Nip}, REGON {item.Regon}. Body: {Truncate(detailResponse.Content, 500)}";
+                            logger.LogWarning("{Failure}", lastFailure);
                             continue;
                         }
 
@@ -110,7 +109,7 @@ public sealed class CeidgInitialImportService(
             await store.CompleteImportRunAsync(
                 importRunId,
                 "completed",
-                new { imported, failed, pagesRead, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                new { imported, failed, pagesRead, lastFailure, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
                 cancellationToken);
 
             logger.LogInformation("CEIDG import completed. Imported={Imported}, Failed={Failed}, PagesRead={PagesRead}.", imported, failed, pagesRead);
@@ -120,11 +119,14 @@ public sealed class CeidgInitialImportService(
             await store.CompleteImportRunAsync(
                 importRunId,
                 "failed",
-                new { imported, failed, pagesRead, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
+                new { imported, failed, pagesRead, lastFailure, options.StartPage, options.PageLimit, options.MaxPages, options.MaxCompanies },
                 CancellationToken.None);
             throw;
         }
     }
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : value[..maxLength];
 
     private Task<CeidgRawResponse> GetDetailAsync(CompanyIndexItem item, CancellationToken cancellationToken)
     {
@@ -146,3 +148,4 @@ public sealed class CeidgInitialImportService(
         throw new InvalidOperationException("CEIDG index item does not contain NIP, REGON or CEIDG id.");
     }
 }
+
