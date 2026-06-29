@@ -1,4 +1,4 @@
-# CEIDG API Wrapper
+# CEIDG_API_WRAPER
 
 Private C#/.NET project for building a local PostgreSQL analytical mirror of CEIDG data.
 
