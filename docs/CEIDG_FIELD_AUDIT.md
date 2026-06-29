@@ -2,7 +2,7 @@
 
 ## Decision
 
-Company data is stored in one PostgreSQL table: `ceidg.company_records`.
+Company data is stored canonically in one PostgreSQL table: `ceidg.company_records`. Report artifacts may have separate source tables when the report shape cannot be stored as direct company columns.
 
 The table keeps queryable scalar columns for common business/search fields and mandatory JSONB columns for complete source fidelity. The canonical full company copy is `raw_detail_payload`; this column must contain the entire `/firma` response for the company. No field from CEIDG may be discarded just because it is nested, repeated, rare, or not yet used by the product API.
 
@@ -48,7 +48,9 @@ The earlier schema only covered a small subset: CEIDG id, NIP, REGON, name, stat
 
 ## Storage Rule
 
-All fields above are preserved in `ceidg.company_records.raw_detail_payload` even if they are also extracted into scalar or JSONB helper columns.
+All company fields above are preserved in `ceidg.company_records.raw_detail_payload` even if they are also extracted into scalar or JSONB helper columns.
+
+Report payloads may be stored in `source.report_payload`, with `source.report_company_link` connecting report data back to `ceidg.company_records` by `company_record_id`, `ceidg_id`, NIP, or REGON. This is acceptable because report storage is not the canonical company record.
 
 High-value nested/list sections are also copied into same-row JSONB columns:
 
@@ -69,3 +71,4 @@ High-value nested/list sections are also copied into same-row JSONB columns:
 ## Import Rule
 
 A company is complete only after detail hydration from `/firma?nip=...`, `/firma?regon=...`, or `/firma/{id}`. `/firmy` may seed the queue, but it must not be treated as the final company snapshot.
+

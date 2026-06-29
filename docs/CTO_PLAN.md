@@ -41,11 +41,12 @@ Legacy fallback/reference:
 
 Use a single-company-table data model:
 
-- `ceidg.company_records` is the only table that stores company data.
-- One CEIDG company equals one row in `ceidg.company_records`.
+- `ceidg.company_records` is the only canonical table that stores unique company data.
+- One CEIDG company equals one row in `ceidg.company_records` whenever a CEIDG id/NIP/REGON can identify it.
 - The row contains scalar columns for common filters plus JSONB columns for nested/list sections.
 - `raw_detail_payload jsonb` is mandatory and stores the full `/firma` response, so every CEIDG field is preserved even if we have not extracted it yet.
 - `/firmy` data may be stored as `raw_index_payload`, but it is only an index/search snapshot and never the canonical company copy.
+- Report data may use auxiliary `source.report_payload` and `source.report_company_link` tables if reports cannot be represented as company columns. These tables are source/import artifacts, not the canonical company model. They must link back to `ceidg.company_records` by `ceidg_id`, NIP, REGON, or `company_record_id` when possible.
 
 The ingestion service upserts one row per company after detail hydration. A company is not complete until `/firma?nip=...`, `/firma?regon=...`, or `/firma/{id}` has been fetched and stored.
 
@@ -75,12 +76,14 @@ Recommended stack:
 Initial schemas:
 
 - `ceidg` for the single current company table.
-- `source` only for import-run metadata, not duplicate company data.
+- `source` for import-run metadata and raw report artifacts. It must not become a duplicate canonical company store.
 - `app` for API users, keys, saved searches, exports, and product-specific data later.
 
 Critical tables:
 
 - `source.import_run`
+- `source.report_payload`
+- `source.report_company_link`
 - `ceidg.company_records`
 
 Identity and idempotency:
@@ -101,7 +104,7 @@ Phase 1: API access and schema discovery
 
 Phase 2: Full initial load
 
-- Prefer official reports from `/raporty` and `/raport/{id}` if they provide bulk/full datasets.
+- Prefer official reports from `/raporty` and `/raport/{id}` if they provide bulk/full datasets. Store report payloads separately only when their shape is report-level rather than one-company-per-row, then link report items to `ceidg.company_records` by CEIDG id, NIP, or REGON.
 - If reports are not suitable, partition `/firmy` requests by deterministic criteria:
   - date ranges,
   - statuses,
@@ -170,7 +173,7 @@ Milestone 2: Database foundation
 
 - Add PostgreSQL schema migrations.
 - Add the single `ceidg.company_records` table.
-- Add import run metadata.
+- Add import run metadata and report payload/link tables only for report artifacts.
 - Ensure `raw_detail_payload` preserves every `/firma` field.
 
 Milestone 3: Initial importer
@@ -204,6 +207,7 @@ Start with a small proof of concept:
 5. Persist the first complete company into one `ceidg.company_records` row with full `raw_detail_payload`.
 
 This validates the most important unknowns before we commit to a large import design.
+
 
 
 

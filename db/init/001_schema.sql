@@ -110,3 +110,44 @@ create index if not exists ix_company_records_voivodeship on ceidg.company_recor
 create index if not exists ix_company_records_raw_detail_payload on ceidg.company_records using gin (raw_detail_payload);
 create index if not exists ix_company_records_pkd_codes on ceidg.company_records using gin (pkd_codes);
 
+
+create table if not exists source.report_payload (
+    id uuid primary key,
+    ceidg_report_id text not null unique,
+    request_uri text not null,
+    status_code integer not null,
+    content_hash text not null,
+    payload jsonb not null,
+    fetched_at_utc timestamptz not null,
+    import_run_id uuid null references source.import_run(id)
+);
+
+create index if not exists ix_report_payload_content_hash on source.report_payload (content_hash);
+create index if not exists ix_report_payload_payload on source.report_payload using gin (payload);
+
+create table if not exists source.report_company_link (
+    id bigserial primary key,
+    report_id uuid not null references source.report_payload(id) on delete cascade,
+    company_record_id uuid null references ceidg.company_records(id) on delete set null,
+    ceidg_id text null,
+    nip text null,
+    regon text null,
+    linked_at_utc timestamptz not null,
+    link_status text not null,
+    link_warnings jsonb not null default '[]'::jsonb,
+    constraint ck_report_company_link_status check (link_status in ('linked', 'unmatched', 'ambiguous'))
+);
+
+create unique index if not exists ux_report_company_link_identity
+    on source.report_company_link (
+        report_id,
+        coalesce(ceidg_id, ''),
+        coalesce(nip, ''),
+        coalesce(regon, '')
+    );
+
+create index if not exists ix_report_company_link_company_record_id on source.report_company_link (company_record_id);
+create index if not exists ix_report_company_link_nip on source.report_company_link (nip);
+create index if not exists ix_report_company_link_regon on source.report_company_link (regon);
+create index if not exists ix_report_company_link_ceidg_id on source.report_company_link (ceidg_id);
+
