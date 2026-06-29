@@ -6,7 +6,15 @@ The target product is a data platform/API that can ingest CEIDG public business 
 
 ## Current Status
 
-This repository currently contains the CTO plan and source API documentation copies. Implementation should start with an ingestion proof of concept against CEIDG API v2, then evolve into a production-grade import pipeline.
+The repository contains the CTO plan, CEIDG source documentation copies, and the first .NET solution skeleton:
+
+- `CeidgMirror.Api` - API host for read/query endpoints.
+- `CeidgMirror.Worker` - background ingestion/synchronization host.
+- `CeidgMirror.Application` - orchestration interfaces.
+- `CeidgMirror.Infrastructure` - CEIDG HTTP client and rate pacing.
+- `CeidgMirror.Contracts` - source/API DTO contracts.
+- `CeidgMirror.Domain` - domain model.
+- `CeidgMirror.Tests` - unit tests.
 
 ## Source APIs
 
@@ -21,6 +29,32 @@ This repository currently contains the CTO plan and source API documentation cop
 - API v2 exposes paginated list endpoints and a change endpoint for incremental synchronization.
 - The local PostgreSQL database must retain source fidelity, not only a lossy projection.
 
+## Build And Test
+
+```powershell
+dotnet build CeidgMirror.slnx
+dotnet test CeidgMirror.slnx --no-build
+```
+
+## Local PostgreSQL
+
+```powershell
+docker compose up -d postgres
+```
+
+The development database is created as `ceidg_mirror` with initial schemas from `db/init/001_schema.sql`.
+
+## CEIDG Configuration
+
+Set the JWT outside source control, for example:
+
+```powershell
+$env:CeidgApi__JwtToken = "YOUR_TOKEN"
+```
+
+The current default base URL points to the CEIDG test environment.
+
 ## Documents
 
 - [CTO plan](docs/CTO_PLAN.md)
+

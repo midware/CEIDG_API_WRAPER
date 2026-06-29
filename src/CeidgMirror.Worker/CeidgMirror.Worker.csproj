@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-CeidgMirror.Worker-5c94c12d-082b-4591-b095-1107f45d2a61</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CeidgMirror.Application\CeidgMirror.Application.csproj" />
+    <ProjectReference Include="..\CeidgMirror.Infrastructure\CeidgMirror.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

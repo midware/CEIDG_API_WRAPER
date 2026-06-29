@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CeidgMirror.Api/CeidgMirror.Api.csproj" />
+    <Project Path="src/CeidgMirror.Application/CeidgMirror.Application.csproj" />
+    <Project Path="src/CeidgMirror.Contracts/CeidgMirror.Contracts.csproj" />
+    <Project Path="src/CeidgMirror.Domain/CeidgMirror.Domain.csproj" />
+    <Project Path="src/CeidgMirror.Infrastructure/CeidgMirror.Infrastructure.csproj" />
+    <Project Path="src/CeidgMirror.Worker/CeidgMirror.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CeidgMirror.Tests/CeidgMirror.Tests.csproj" />
+  </Folder>
+</Solution>
