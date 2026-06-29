@@ -9,6 +9,7 @@ public sealed class ImportOptions
     public string Source { get; init; } = "ChangesApi";
     public DateOnly ChangesFrom { get; init; } = new(2011, 7, 1);
     public DateOnly? ChangesTo { get; init; }
+    public int ChangesWindowDays { get; init; } = 1;
     public bool Resume { get; init; } = true;
     public bool SkipExistingCompanies { get; init; } = true;
     public int StartPage { get; init; } = 1;

@@ -2,7 +2,8 @@ using CeidgMirror.Api;
 using CeidgMirror.Infrastructure.Ceidg;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+AddLocalSettings(builder.Configuration, "CeidgMirror.Api");
+builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddOpenApi();
 builder.Services.AddCeidgClient(builder.Configuration);
@@ -30,3 +31,19 @@ app.MapGet("/ceidg/config", (CeidgApiOptions options) => Results.Ok(new
 }));
 
 app.Run();
+
+static void AddLocalSettings(IConfigurationBuilder configuration, string projectName)
+{
+    var candidates = new[]
+    {
+        Path.Combine(AppContext.BaseDirectory, "appsettings.Local.json"),
+        Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Local.json"),
+        Path.Combine(Directory.GetCurrentDirectory(), "src", projectName, "appsettings.Local.json"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "appsettings.Local.json")
+    };
+
+    foreach (var path in candidates.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        configuration.AddJsonFile(path, optional: true, reloadOnChange: true);
+    }
+}
