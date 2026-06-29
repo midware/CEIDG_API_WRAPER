@@ -106,6 +106,13 @@ public sealed class CeidgInitialImportService(
                         break;
                     }
 
+                    logger.LogInformation(
+                        "Requesting CEIDG /zmiana for {WindowFrom}..{WindowTo} page {Page} limit {Limit}.",
+                        windowFrom,
+                        windowTo,
+                        page,
+                        options.PageLimit);
+
                     var changesResponse = await ceidgClient.GetChangesAsync(
                         windowFrom,
                         windowTo,
@@ -645,13 +652,13 @@ public sealed class CeidgInitialImportService(
         var builder = new StringBuilder(normalized.Length);
         foreach (var character in normalized)
         {
-            if (character == 'ł')
+            if (character == '\u0142')
             {
                 builder.Append('l');
                 continue;
             }
 
-            if (character == 'Ł')
+            if (character == '\u0141')
             {
                 builder.Append('L');
                 continue;
