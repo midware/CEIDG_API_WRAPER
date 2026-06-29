@@ -11,8 +11,8 @@ internal static class CeidgServiceRegistration
 
         services.AddSingleton(options);
         services.AddSingleton(new SlidingWindowRequestPacer(
-            options.RequestLimit,
-            TimeSpan.FromSeconds(options.WindowSeconds)));
+            new SlidingWindowRequestPacer.Window(options.RequestLimit, TimeSpan.FromSeconds(options.WindowSeconds)),
+            new SlidingWindowRequestPacer.Window(options.HourlyRequestLimit, TimeSpan.FromSeconds(options.HourlyWindowSeconds))));
         services.AddSingleton<HttpClient>();
         services.AddSingleton<ICeidgClient, CeidgClient>();
 

@@ -53,6 +53,24 @@ $env:PGPASSWORD = "postgres"
 
 Use `-p 5433` for the second local PostgreSQL instance if needed.
 
+
+## Import Worker
+
+The worker does not import automatically by default. Enable it explicitly:
+
+```powershell
+$env:CeidgApi__JwtToken = "YOUR_TOKEN"
+$env:Import__Enabled = "true"
+$env:Import__RunOnce = "true"
+$env:Import__MaxPages = "1"
+$env:Import__MaxCompanies = "10"
+$env:Postgres__ConnectionString = "Host=localhost;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
+dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
+```
+
+The importer first reads `/firmy`, then fetches full company details from `/firma?nip=...`, `/firma?regon=...`, or `/firma/{id}`, and finally upserts one row into `ceidg.company_records` with the full `raw_detail_payload`.
+
+API pacing is enforced with both CEIDG documented windows: 50 requests per 180 seconds and 1000 requests per 3600 seconds.
 ## CEIDG Configuration
 
 Set the JWT outside source control, for example:
@@ -67,6 +85,7 @@ The current default base URL points to the CEIDG test environment.
 
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
+
 
 
 
