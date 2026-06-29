@@ -2,6 +2,7 @@ using CeidgMirror.Api;
 using CeidgMirror.Infrastructure.Ceidg;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddOpenApi();
 builder.Services.AddCeidgClient(builder.Configuration);
