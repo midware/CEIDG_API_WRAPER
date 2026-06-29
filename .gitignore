@@ -1,0 +1,23 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.log
+*.tmp
+
+# Local secrets and runtime state
+.env
+.env.*
+appsettings.Development.json
+secrets.json
+
+# Imported source documentation copies
+*.pdf.txt
+
+# Database/runtime artifacts
+*.db
+*.sqlite
+*.bak
+pgdata/
