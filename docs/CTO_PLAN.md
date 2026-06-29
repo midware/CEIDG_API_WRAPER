@@ -39,23 +39,15 @@ Legacy fallback/reference:
 
 ## 3. Strategic Architecture
 
-Use a two-layer data model:
+Use a single-company-table data model:
 
-1. Raw source layer:
-   - Store the exact JSON/XML payload from CEIDG.
-   - Store endpoint, request parameters, response status, fetch timestamp, source schema/version, and content hash.
-   - This protects us from schema drift and lets us reprocess without re-calling CEIDG.
+- `ceidg.company_records` is the only table that stores company data.
+- One CEIDG company equals one row in `ceidg.company_records`.
+- The row contains scalar columns for common filters plus JSONB columns for nested/list sections.
+- `raw_detail_payload jsonb` is mandatory and stores the full `/firma` response, so every CEIDG field is preserved even if we have not extracted it yet.
+- `/firmy` data may be stored as `raw_index_payload`, but it is only an index/search snapshot and never the canonical company copy.
 
-2. Normalized relational layer:
-   - Company core table.
-   - Owner/person table where legally and technically appropriate.
-   - Addresses table.
-   - PKD codes table.
-   - Status/history table.
-   - Civil partnerships table.
-   - Legal restrictions, licenses, qualifications, insolvency/succession sections if present in API v2 detailed payload.
-
-The ingestion service writes raw payloads first, then transforms them into normalized tables in one transactional unit. A failed transform must not lose raw data.
+The ingestion service upserts one row per company after detail hydration. A company is not complete until `/firma?nip=...`, `/firma?regon=...`, or `/firma/{id}` has been fetched and stored.
 
 ## 4. Proposed .NET Solution Layout
 
@@ -64,7 +56,7 @@ Create one solution with clear service boundaries:
 - `CeidgMirror.Api` - public/internal API over PostgreSQL.
 - `CeidgMirror.Worker` - background ingestion and synchronization service.
 - `CeidgMirror.Infrastructure` - PostgreSQL, HTTP clients, rate limiting, persistence.
-- `CeidgMirror.Domain` - normalized domain model and business rules.
+- `CeidgMirror.Domain` - company record domain model and business rules.
 - `CeidgMirror.Application` - import orchestration, commands, queries, validation.
 - `CeidgMirror.Contracts` - DTOs for API responses and CEIDG source models.
 - `CeidgMirror.Tests` - unit and integration tests.
@@ -73,9 +65,8 @@ Recommended stack:
 
 - .NET 9 or latest LTS available in the target deployment environment.
 - ASP.NET Core Minimal APIs or Controllers.
-- EF Core for normalized relational model.
-- Dapper or Npgsql bulk APIs for high-volume import paths where EF is too slow.
-- PostgreSQL with JSONB for raw payloads and GIN indexes for selective raw queries.
+- Dapper or Npgsql bulk APIs for high-volume upserts into the single company table.
+- PostgreSQL JSONB for full CEIDG payload fidelity and GIN indexes for selective raw/nested queries.
 - Hangfire, Quartz.NET, or a hosted worker with durable import job tables.
 - OpenTelemetry, Serilog, and structured metrics from day one.
 
@@ -83,32 +74,21 @@ Recommended stack:
 
 Initial schemas:
 
-- `source` for raw CEIDG responses and import metadata.
-- `ceidg` for normalized current-state tables.
-- `history` for change tracking and slowly changing dimensions.
+- `ceidg` for the single current company table.
+- `source` only for import-run metadata, not duplicate company data.
 - `app` for API users, keys, saved searches, exports, and product-specific data later.
 
 Critical tables:
 
-- `source.api_request_log`
-- `source.raw_company_payload`
-- `source.raw_report_payload`
-- `source.import_checkpoint`
-- `ceidg.company`
-- `ceidg.company_identifier`
-- `ceidg.address`
-- `ceidg.company_address`
-- `ceidg.pkd_code`
-- `ceidg.company_pkd`
-- `ceidg.status_history`
-- `ceidg.change_event`
+- `source.import_run`
+- `ceidg.company_records`
 
 Identity and idempotency:
 
 - Use CEIDG `id` as the main external identifier when available.
-- Keep NIP and REGON as indexed identifiers, not as the only primary keys.
-- Use a payload hash to skip unchanged records.
-- Store every import run and checkpoint so re-runs are safe.
+- Keep NIP and REGON as indexed columns on `ceidg.company_records`, not separate identifier tables.
+- Use detail payload hash to skip unchanged records.
+- Store every import run so re-runs are safe.
 
 ## 6. Import Strategy
 
@@ -133,7 +113,7 @@ Phase 3: Incremental synchronization
 
 - Use `/zmiana?dataod=YYYY-MM-DD&datado=YYYY-MM-DD&page=...&limit=...`.
 - For every changed identifier, refetch detailed company data.
-- Upsert normalized tables and append a `ceidg.change_event`.
+- Upsert the single `ceidg.company_records` row for every changed company and keep change metadata inside import-run details or same-row payload metadata until a separate audit requirement appears.
 - Maintain checkpoints by date window and page.
 - Reconcile daily, weekly, and monthly to catch missed changes.
 
@@ -141,14 +121,14 @@ Phase 4: Reprocessing and enrichment
 
 - Re-run transformations from raw payloads after schema/model changes.
 - Add analytics projections and materialized views.
-- Add search indexes and API-specific denormalized read models.
+- Add search indexes and API-specific read helpers over `ceidg.company_records`.
 
 ## 7. API Product Roadmap
 
 MVP endpoints:
 
 - Search companies by NIP, REGON, name, status, PKD, city, voivodeship, and date ranges.
-- Company detail endpoint with normalized CEIDG data.
+- Company detail endpoint backed by the full `ceidg.company_records` row and `raw_detail_payload`.
 - Change history endpoint.
 - Export endpoint for CSV/XLSX batches.
 - Basic analytics endpoint: counts by PKD, region, status, creation date.
@@ -189,15 +169,15 @@ Milestone 1: CEIDG API probe
 Milestone 2: Database foundation
 
 - Add PostgreSQL schema migrations.
-- Add raw payload tables.
-- Add import run/checkpoint tables.
-- Add first normalized `company`, `address`, and `pkd` tables.
+- Add the single `ceidg.company_records` table.
+- Add import run metadata.
+- Ensure `raw_detail_payload` preserves every `/firma` field.
 
 Milestone 3: Initial importer
 
 - Implement paginated `/firmy` index import.
 - Implement mandatory detail hydration through `/firma?nip=...` or `/firma/{id}` for every discovered company, including website, phone, email, PKD list, and main PKD.
-- Persist raw and normalized records transactionally.
+- Persist one complete `ceidg.company_records` row per detailed company response.
 - Add idempotent upserts and payload hashing.
 
 Milestone 4: Incremental sync
@@ -221,7 +201,9 @@ Start with a small proof of concept:
 2. Add PostgreSQL Docker Compose.
 3. Add a CEIDG API client with JWT configuration and a conservative rate limiter.
 4. Fetch one page from `/firmy`, extract NIP/id values, then fetch detail records from `/firma?nip=...` or `/firma/{id}` in the test environment.
-5. Persist both raw JSON and the first normalized company row.
+5. Persist the first complete company into one `ceidg.company_records` row with full `raw_detail_payload`.
 
 This validates the most important unknowns before we commit to a large import design.
+
+
 

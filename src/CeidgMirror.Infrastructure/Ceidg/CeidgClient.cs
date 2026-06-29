@@ -33,6 +33,23 @@ public sealed class CeidgClient(
         return SendAsync(uri, cancellationToken);
     }
 
+    public Task<CeidgRawResponse> GetReportsAsync(
+        DateOnly? from = null,
+        DateOnly? to = null,
+        CancellationToken cancellationToken = default)
+    {
+        var uri = CeidgQueryBuilder.BuildReportsUri(options.BaseUrl, from, to);
+        return SendAsync(uri, cancellationToken);
+    }
+
+    public Task<CeidgRawResponse> GetReportByIdAsync(
+        string id,
+        CancellationToken cancellationToken = default)
+    {
+        var uri = CeidgQueryBuilder.BuildReportByIdUri(options.BaseUrl, id);
+        return SendAsync(uri, cancellationToken);
+    }
+
     public Task<CeidgRawResponse> GetChangesAsync(
         DateOnly from,
         DateOnly? to = null,

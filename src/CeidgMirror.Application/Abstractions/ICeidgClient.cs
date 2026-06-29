@@ -16,6 +16,15 @@ public interface ICeidgClient
         string id,
         CancellationToken cancellationToken = default);
 
+    Task<CeidgRawResponse> GetReportsAsync(
+        DateOnly? from = null,
+        DateOnly? to = null,
+        CancellationToken cancellationToken = default);
+
+    Task<CeidgRawResponse> GetReportByIdAsync(
+        string id,
+        CancellationToken cancellationToken = default);
+
     Task<CeidgRawResponse> GetChangesAsync(
         DateOnly from,
         DateOnly? to = null,

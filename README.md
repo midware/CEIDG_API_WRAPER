@@ -57,5 +57,7 @@ The current default base URL points to the CEIDG test environment.
 ## Documents
 
 - [CTO plan](docs/CTO_PLAN.md)
+- [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
+
 
 

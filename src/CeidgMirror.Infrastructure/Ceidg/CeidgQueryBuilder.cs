@@ -41,6 +41,21 @@ public static class CeidgQueryBuilder
         return BuildUri(baseUrl, $"firma/{Uri.EscapeDataString(id)}", null);
     }
 
+    public static Uri BuildReportsUri(Uri baseUrl, DateOnly? from, DateOnly? to)
+    {
+        var builder = new QueryStringBuilder();
+        builder.Add("dataod", from);
+        builder.Add("datado", to);
+
+        return BuildUri(baseUrl, "raporty", builder.ToString());
+    }
+
+    public static Uri BuildReportByIdUri(Uri baseUrl, string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return BuildUri(baseUrl, $"raport/{Uri.EscapeDataString(id)}", null);
+    }
+
     public static Uri BuildChangesUri(Uri baseUrl, DateOnly from, DateOnly? to, int page, int limit)
     {
         var builder = new QueryStringBuilder();

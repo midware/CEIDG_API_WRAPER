@@ -47,6 +47,31 @@ public sealed class CeidgQueryBuilderTests
     }
 
     [Fact]
+    public void BuildReportsUri_UsesRaportyEndpointWithDateRange()
+    {
+        var uri = CeidgQueryBuilder.BuildReportsUri(
+            new Uri("https://test-dane.biznes.gov.pl/api/ceidg/v2/"),
+            new DateOnly(2020, 1, 1),
+            new DateOnly(2020, 1, 31));
+
+        Assert.Equal(
+            "https://test-dane.biznes.gov.pl/api/ceidg/v2/raporty?dataod=2020-01-01&datado=2020-01-31",
+            uri.ToString());
+    }
+
+    [Fact]
+    public void BuildReportByIdUri_UsesRaportEndpoint()
+    {
+        var uri = CeidgQueryBuilder.BuildReportByIdUri(
+            new Uri("https://test-dane.biznes.gov.pl/api/ceidg/v2/"),
+            "0e8d5775-9eaf-4d9d-ab34-829f706a893e");
+
+        Assert.Equal(
+            "https://test-dane.biznes.gov.pl/api/ceidg/v2/raport/0e8d5775-9eaf-4d9d-ab34-829f706a893e",
+            uri.ToString());
+    }
+
+    [Fact]
     public void BuildChangesUri_UsesDateRangeAndPaging()
     {
         var uri = CeidgQueryBuilder.BuildChangesUri(
