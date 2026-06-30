@@ -92,6 +92,27 @@ $env:CeidgApi__JwtToken = "YOUR_TOKEN"
 
 Do not commit real tokens. The current default base URL points to the active CEIDG v3 company API.
 
+## Docker Worker
+
+Build the worker image:
+
+```powershell
+docker build -t ceidg-mirror-worker .
+```
+
+Run PostgreSQL and the import worker through Compose:
+
+```powershell
+$env:CEIDG_JWT_TOKEN = "YOUR_TOKEN"
+docker compose --profile worker up -d --build
+```
+
+The Compose worker connects to the Compose PostgreSQL service with `Host=postgres;Port=5432`. If you want a containerized worker to use your Windows PostgreSQL on port `5433`, override:
+
+```powershell
+$env:Postgres__ConnectionString = "Host=host.docker.internal;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
+docker compose --profile worker up -d --build worker
+```
 ## Documents
 
 - [CTO plan](docs/CTO_PLAN.md)

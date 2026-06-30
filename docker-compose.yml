@@ -17,5 +17,42 @@ services:
       timeout: 5s
       retries: 5
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ceidg-mirror-worker
+    profiles:
+      - worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      CeidgApi__BaseUrl: https://dane.biznes.gov.pl/api/ceidg/v3/
+      CeidgApi__ReportsBaseUrl: https://dane.biznes.gov.pl/raporty/
+      CeidgApi__JwtToken: ${CEIDG_JWT_TOKEN:?Set CEIDG_JWT_TOKEN in your shell or .env file}
+      CeidgApi__RequestLimit: 50
+      CeidgApi__WindowSeconds: 180
+      CeidgApi__HourlyRequestLimit: 1000
+      CeidgApi__HourlyWindowSeconds: 3600
+      CeidgApi__MinimumRequestIntervalSeconds: 4
+      CeidgApi__RequestTimeoutSeconds: 300
+      Postgres__ConnectionString: ${POSTGRES_CONNECTION_STRING:-Host=postgres;Port=5432;Database=ceidg_mirror;Username=ceidg;Password=ceidg_dev_password}
+      Import__Enabled: "true"
+      Import__RunOnce: "false"
+      Import__Source: ChangesApi
+      Import__ChangesFrom: "2011-07-01"
+      Import__ChangesWindowDays: 1
+      Import__Resume: "true"
+      Import__SkipExistingCompanies: "true"
+      Import__StartPage: 1
+      Import__PageLimit: 50
+      Import__MaxPages: 0
+      Import__MaxCompanies: 0
+      Import__LoopDelayMinutes: 60
+      Import__FailureRetryDelayMinutes: 5
+    restart: unless-stopped
+
 volumes:
   ceidg_pgdata:
