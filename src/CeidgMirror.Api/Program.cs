@@ -56,6 +56,7 @@ app.UseSwaggerUI(options =>
 });
 app.MapOpenApi();
 app.MapLeadbaseSite();
+app.MapLeadbaseLegal();
 app.MapLeadbaseAccount();
 app.MapProductApi();
 

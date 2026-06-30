@@ -17,4 +17,9 @@
     <ProjectReference Include="..\CeidgMirror.Contracts\CeidgMirror.Contracts.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Content Include="..\..\docs\legal\**\*.md" Link="docs\legal\%(RecursiveDir)%(Filename)%(Extension)" TargetPath="docs\legal\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

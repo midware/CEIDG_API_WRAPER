@@ -477,7 +477,7 @@ public static class LeadbaseSiteEndpoints
     </section>
   </main>
 
-  <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/swagger">Swagger</a></footer>
+  <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/terms">Regulamin</a><a href="/privacy">Prywatność</a><a href="/cookies">Cookies</a><a href="/opt-out">Opt-out</a><a href="/swagger">Swagger</a></footer>
   <script src="/leadbase.js"></script>
 </body>
 </html>
