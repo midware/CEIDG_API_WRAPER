@@ -154,7 +154,7 @@ public static class LeadbaseSiteEndpoints
 </html>
 """;
 
-    private static string RenderCreatedApiKeyHtml(string apiKey, string keyPrefix) => $"""
+    private static string RenderCreatedApiKeyHtml(string apiKey, string keyPrefix) => $$"""
 <!doctype html>
 <html lang="pl">
 <head>
@@ -167,12 +167,29 @@ public static class LeadbaseSiteEndpoints
   <main class="account-shell">
     <section class="account-form api-key-created">
       <h1>Klucz API został utworzony</h1>
-      <p>Zapisz go teraz w bezpiecznym miejscu. Po opuszczeniu tej strony widoczny będzie tylko prefiks.</p>
-      <div class="one-time-key"><span>Prefiks</span><strong>{Html(keyPrefix)}</strong></div>
-      <code>{Html(apiKey)}</code>
-      <a class="button button-primary" href="/app">Wróć do panelu</a>
+      <p>To jedyny moment, w którym pokazujemy pełny klucz. Skopiuj go teraz i zapisz w bezpiecznym miejscu.</p>
+      <div class="one-time-key"><span>Prefiks widoczny później w panelu</span><strong>{{Html(keyPrefix)}}</strong></div>
+      <label class="api-key-copy-box">Pełny klucz API
+        <input id="created-api-key" type="text" value="{{Html(apiKey)}}" readonly autocomplete="off" spellcheck="false">
+      </label>
+      <button class="button button-primary" type="button" id="copy-created-api-key">Kopiuj klucz</button>
+      <a class="button button-secondary" href="/app">Wróć do panelu</a>
     </section>
   </main>
+  <script>
+    const keyInput = document.getElementById('created-api-key');
+    const copyButton = document.getElementById('copy-created-api-key');
+    copyButton.addEventListener('click', async () => {
+      keyInput.focus();
+      keyInput.select();
+      try {
+        await navigator.clipboard.writeText(keyInput.value);
+      } catch {
+        document.execCommand('copy');
+      }
+      copyButton.textContent = 'Skopiowano';
+    });
+  </script>
 </body>
 </html>
 """;

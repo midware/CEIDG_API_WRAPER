@@ -224,6 +224,8 @@ ul { padding-left: 18px; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+
+
 @media (max-width: 720px) {
   .site-header { position: static; align-items: flex-start; gap: 14px; padding: 18px; flex-direction: column; }
   .header-actions { width: 100%; }
@@ -714,6 +716,34 @@ ul { padding-left: 18px; }
   background: #fbfdfe;
   font-size: 13px;
   line-height: 1.5;
+}
+
+
+
+.api-key-copy-box {
+  display: grid;
+  gap: 8px;
+  color: #405159;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.api-key-copy-box input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #cfdbe0;
+  border-radius: 8px;
+  background: #fbfdfe;
+  color: #102a32;
+  font: 700 13px/1.4 Consolas, Monaco, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.api-key-copy-box input:focus {
+  outline: 3px solid rgba(8, 127, 122, .18);
+  border-color: var(--teal);
 }
 
 .one-time-key {
