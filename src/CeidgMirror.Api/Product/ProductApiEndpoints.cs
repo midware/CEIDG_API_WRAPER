@@ -102,9 +102,9 @@ public static class ProductApiEndpoints
 
         var account = app.MapGroup("/account").WithTags("Account");
 
-        account.MapGet("/balance", async (HttpContext httpContext, ProductApiStore store, CancellationToken cancellationToken) =>
+        account.MapGet("/balance", async ([FromHeader(Name = "X-Api-Key")] string? apiKey, ProductApiStore store, CancellationToken cancellationToken) =>
         {
-            var user = await RequireApiUserAsync(httpContext, store, cancellationToken);
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
             return user is null ? Results.Unauthorized() : Results.Ok(new BalanceResponse(user.TokenBalance));
         })
         .WithSummary("Get current token balance");
@@ -130,7 +130,7 @@ public static class ProductApiEndpoints
         .WithSummary("List selectable company columns and token weights");
 
         companies.MapGet("", async (
-            HttpContext httpContext,
+            [FromHeader(Name = "X-Api-Key")] string? apiKey,
             ProductApiStore store,
             ProductApiOptions options,
             [FromQuery] string? columns,
@@ -144,7 +144,7 @@ public static class ProductApiEndpoints
             [FromQuery] string? mainPkdCode,
             CancellationToken cancellationToken) =>
         {
-            var user = await RequireApiUserAsync(httpContext, store, cancellationToken);
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
             if (user is null)
             {
                 return Results.Unauthorized();
@@ -185,14 +185,8 @@ public static class ProductApiEndpoints
         return app;
     }
 
-    private static async Task<ApiUserContext?> RequireApiUserAsync(HttpContext httpContext, ProductApiStore store, CancellationToken cancellationToken)
+    private static async Task<ApiUserContext?> RequireApiUserAsync(string? apiKey, ProductApiStore store, CancellationToken cancellationToken)
     {
-        if (!httpContext.Request.Headers.TryGetValue("X-Api-Key", out var values))
-        {
-            return null;
-        }
-
-        var apiKey = values.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return null;
