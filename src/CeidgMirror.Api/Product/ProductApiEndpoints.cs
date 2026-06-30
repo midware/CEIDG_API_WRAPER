@@ -10,7 +10,7 @@ namespace CeidgMirror.Api;
 public sealed class ProductApiOptions
 {
     public const string SectionName = "ProductApi";
-    public long FreeRegistrationTokens { get; init; } = 1000;
+    public long FreeRegistrationTokens { get; init; } = 5000;
     public int DefaultPageSize { get; init; } = 25;
     public int MaxPageSize { get; init; } = 100;
 }
@@ -131,9 +131,10 @@ public static class ProductApiEndpoints
 
         billing.MapGet("/token-packages", () => Results.Ok(new[]
         {
-            new TokenPackageResponse("starter", "Starter", 10_000, 49),
-            new TokenPackageResponse("growth", "Growth", 100_000, 349),
-            new TokenPackageResponse("scale", "Scale", 1_000_000, 2499)
+            new TokenPackageResponse("starter", "Starter", 50_000, 49),
+            new TokenPackageResponse("growth", "Growth", 250_000, 149),
+            new TokenPackageResponse("scale", "Scale", 1_000_000, 399),
+            new TokenPackageResponse("enterprise", "Enterprise", 3_000_000, 999)
         }))
         .WithSummary("List available token packages");
 
@@ -746,10 +747,30 @@ public static class CompanyColumnCatalog
 
 public static class TokenPricing
 {
+    private static readonly string[] ContactColumns = { "phone", "email", "website" };
+
     public static long CalculateCost(IReadOnlyList<CompanyColumn> columns, int returnedRows)
     {
-        var columnWeight = columns.Sum(column => column.TokenWeight);
-        return 1 + (long)Math.Max(1, returnedRows) * columnWeight;
+        var rows = Math.Max(1, returnedRows);
+        var selected = columns.Select(column => column.ApiName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var rowCost = 1L;
+        if (ContactColumns.Any(selected.Contains))
+        {
+            rowCost += 1;
+        }
+
+        if (selected.Contains("pkdCodes"))
+        {
+            rowCost += 1;
+        }
+
+        if (selected.Contains("rawDetailPayload"))
+        {
+            rowCost += 10;
+        }
+
+        return 1 + rows * rowCost;
     }
 }
 

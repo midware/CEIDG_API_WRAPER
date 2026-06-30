@@ -451,12 +451,12 @@ public static class LeadbaseSiteEndpoints
     </section>
 
     <section class="pricing" id="cennik">
-      <div class="section-head"><h2>Pakiety tokenów</h2><p>Model docelowy: użytkownik kupuje pulę tokenów i zużywa ją na zapytania API.</p></div>
+      <div class="section-head"><h2>Pakiety tokenów</h2><p>Token rozliczamy jako koszt pobranego profilu firmy, a nie każdej pojedynczej kolumny. Dane kontaktowe i raw JSON kosztują więcej, ale podstawowe wyszukiwanie pozostaje tanie.</p></div>
       <div class="price-grid">
-        <article><small>START</small><h3>49 zł</h3><p>500 tokenów</p><ul><li>Ważność 30 dni</li><li>Wsparcie email</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
-        <article class="featured"><small>PRO</small><h3>199 zł</h3><p>2 500 tokenów</p><ul><li>Ważność 30 dni</li><li>Wsparcie priorytetowe</li></ul><a class="button button-primary" href="/swagger">Wybierz pakiet</a></article>
-        <article><small>BUSINESS</small><h3>499 zł</h3><p>7 500 tokenów</p><ul><li>Ważność 30 dni</li><li>Indywidualne limity</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
-        <article><small>ENTERPRISE</small><h3>Indywidualnie</h3><p>Wysoki wolumen</p><ul><li>SLA</li><li>Dedykowane warunki</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj się</a></article>
+        <article><small>STARTER</small><h3>49 zł</h3><p>50 000 tokenów</p><ul><li>około 50 000 profili podstawowych</li><li>około 25 000 profili z kontaktem</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article class="featured"><small>GROWTH</small><h3>149 zł</h3><p>250 000 tokenów</p><ul><li>około 250 000 profili podstawowych</li><li>około 125 000 profili z kontaktem</li></ul><a class="button button-primary" href="/register">Wybierz pakiet</a></article>
+        <article><small>SCALE</small><h3>399 zł</h3><p>1 000 000 tokenów</p><ul><li>około 1 000 000 profili podstawowych</li><li>około 500 000 profili z kontaktem</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article><small>ENTERPRISE</small><h3>999 zł</h3><p>3 000 000 tokenów</p><ul><li>wysoki wolumen</li><li>indywidualne limity i SLA</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj się</a></article>
       </div>
     </section>
 
