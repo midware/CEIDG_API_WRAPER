@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
 
 namespace CeidgMirror.Api;
 
@@ -9,14 +10,26 @@ public static class LeadbaseSiteEndpoints
 
     public static WebApplication MapLeadbaseSite(this WebApplication app)
     {
-        app.MapGet("/", () => Results.Content(HomeHtml, "text/html; charset=utf-8"))
+        app.MapGet("/", (HttpContext context) => Results.Content(RenderHomeHtml(context), "text/html; charset=utf-8"))
             .ExcludeFromDescription();
 
         app.MapGet("/docs", () => Results.Redirect("/swagger"))
             .ExcludeFromDescription();
 
-        app.MapGet("/app", () => Results.Content(HomeHtml.Replace("<body>", "<body data-scroll-target=\"dashboard\">"), "text/html; charset=utf-8"))
-            .ExcludeFromDescription();
+        app.MapGet("/app", async (HttpContext context, ProductApiStore store, CancellationToken cancellationToken) =>
+        {
+            var userId = GetSignedInUserId(context);
+            if (userId is null)
+            {
+                return Results.Redirect("/login");
+            }
+
+            var account = await store.GetAccountPanelAsync(userId.Value, cancellationToken);
+            return account is null
+                ? Results.Redirect("/login")
+                : Results.Content(RenderAppHtml(account), "text/html; charset=utf-8");
+        })
+        .ExcludeFromDescription();
 
         app.MapGet("/demo/companies", (HttpContext context, string? name, string? city, string? mainPkdCode, string? columns) =>
         {
@@ -49,6 +62,75 @@ public static class LeadbaseSiteEndpoints
 
         return app;
     }
+
+    private static string RenderHomeHtml(HttpContext context)
+    {
+        var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
+        var email = context.User.FindFirstValue(ClaimTypes.Email) ?? context.User.Identity?.Name ?? "konto";
+        var headerActions = isAuthenticated
+            ? $"<a class=\"button button-ghost\" href=\"/app\">Panel</a><a class=\"button button-primary\" href=\"/logout\">Wyloguj siê</a>"
+            : "<a class=\"button button-ghost\" href=\"/login\">Logowanie</a><a class=\"button button-primary\" href=\"/register\">Utwórz konto</a>";
+        var heroActions = isAuthenticated
+            ? $"<a class=\"button button-primary button-large\" href=\"/app\">PrzejdŸ do panelu</a><a class=\"button button-secondary button-large\" href=\"/logout\">Wyloguj siê</a>"
+            : "<a class=\"button button-primary button-large\" href=\"/register\">Utwórz konto</a><a class=\"button button-secondary button-large\" href=\"/swagger\">Zobacz Swagger</a>";
+        var accountLabel = isAuthenticated ? $"<span class=\"account-chip\">{Html(email)}</span>" : string.Empty;
+
+        return HomeHtml
+            .Replace("{{ACCOUNT_ACTIONS}}", headerActions)
+            .Replace("{{HERO_ACTIONS}}", heroActions)
+            .Replace("{{ACCOUNT_LABEL}}", accountLabel);
+    }
+
+    private static Guid? GetSignedInUserId(HttpContext context)
+    {
+        var value = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private static string RenderAppHtml(AccountPanel account) => $"""
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel - leadbase.network</title>
+  <link rel="stylesheet" href="/leadbase.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><span class="brand-mark">lb</span><span>leadbase.network</span></a>
+    <nav class="nav"><a href="/app">Panel</a><a href="/swagger">Dokumentacja</a><a href="/#tester">Tester</a></nav>
+    <div class="header-actions"><span class="account-chip">{Html(account.Email)}</span><a class="button button-primary" href="/logout">Wyloguj siê</a></div>
+  </header>
+  <main class="real-app-shell">
+    <section class="real-app-head">
+      <div><h1>Panel u¿ytkownika</h1><p>Saldo tokenów, klucze API i historia u¿ycia bêd¹ rozwijane w kolejnych krokach.</p></div>
+      <a class="button button-secondary" href="/#tester">Testuj endpoint</a>
+    </section>
+    <section class="metrics app-metrics">
+      <article><span>Email</span><b>{Html(account.Email)}</b></article>
+      <article><span>Dostêpne tokeny</span><b>{account.TokenBalance:N0}</b></article>
+      <article><span>Klucze API</span><b>{account.ApiKeyCount}</b></article>
+      <article><span>Zapytania</span><b>{account.QueryCount}</b></article>
+    </section>
+    <section class="dashboard-frame real-app-frame">
+      <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Tokeny</a><a>Klucze API</a><a>Historia u¿ycia</a><a>Faktury</a></aside>
+      <div class="dash-main">
+        <h2>Najbli¿sze modu³y</h2>
+        <div class="panel-list">
+          <div><strong>Klucze API</strong><span>Tworzenie, nazwy, cofanie i ostatnie u¿ycie.</span></div>
+          <div><strong>Token ledger</strong><span>Pe³na historia zu¿ycia i do³adowañ.</span></div>
+          <div><strong>P³atnoœci</strong><span>Zakup pakietów tokenów i faktury.</span></div>
+          <div><strong>CRM</strong><span>Listy leadów, notatki oraz kampanie email/SMS.</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+""";
+
+    private static string Html(string? value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
     private static string GetAnonymousDemoKey(HttpContext context)
     {
         var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";

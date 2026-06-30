@@ -31,6 +31,7 @@ public sealed record CompanySearchResponse(
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Items);
 
 public sealed record ApiUserContext(Guid UserId, string Email, long TokenBalance);
+public sealed record AccountPanel(Guid UserId, string Email, long TokenBalance, int ApiKeyCount, long QueryCount);
 
 public static class ProductApiEndpoints
 {
@@ -348,6 +349,29 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         return key;
     }
 
+    public async Task<AccountPanel?> GetAccountPanelAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            select u.id,
+                   u.email,
+                   u.token_balance,
+                   (select count(*)::int from app.api_keys k where k.user_id = u.id and k.revoked_at_utc is null) as api_key_count,
+                   (select count(*)::bigint from app.api_query_log q where q.user_id = u.id) as query_count
+            from app.api_users u
+            where u.id = $1
+              and u.disabled_at_utc is null
+              and u.email_confirmed_at_utc is not null
+            """);
+        command.Parameters.AddWithValue(userId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new AccountPanel(reader.GetGuid(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt32(3), reader.GetInt64(4));
+    }
     public async Task<ApiUserContext?> GetUserByApiKeyAsync(string apiKey, CancellationToken cancellationToken)
     {
         var keyHash = ApiKeySecurity.HashApiKey(apiKey);
