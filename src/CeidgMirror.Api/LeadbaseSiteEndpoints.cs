@@ -159,7 +159,7 @@ public static class LeadbaseSiteEndpoints
           {RenderLedger(account.Ledger)}
         </section>
         <section class="panel-section" id="usage">
-          <div class="panel-section-head"><div><h2>Historia użycia API</h2><p>Ostatnie zapytania z kosztem tokenowym i wybranymi kolumnami.</p></div></div>
+          <div class="panel-section-head"><div><h2>Historia użycia API</h2><p>Ostatnie zapytania z kosztem tokenowym i wybranymi kolumnami. Starsze wpisy zachowują koszt naliczony według cennika obowiązującego w momencie zapytania.</p></div></div>
           {RenderQueryLogs(account.QueryLogs)}
         </section>
       </div>
@@ -411,6 +411,8 @@ public static class LeadbaseSiteEndpoints
     <nav class="nav" aria-label="Główna nawigacja">
       <a href="#produkt">Produkt</a>
       <a href="#api">API</a>
+      <a href="#zastosowania">Zastosowania</a>
+      <a href="#analityka">Analityka</a>
       <a href="#cennik">Cennik</a>
       <a href="/swagger">Dokumentacja</a>
       <a href="#dashboard">Panel</a>
@@ -512,6 +514,27 @@ public static class LeadbaseSiteEndpoints
       </div>
     </section>
 
+
+    <section class="steps" id="zastosowania">
+      <div class="section-head"><h2>Do czego używać API?</h2><p>leadbase.network nadaje się zarówno do szybkiej weryfikacji pojedynczej firmy, jak i do budowania procesów sprzedażowych, CRM oraz scoringu B2B.</p></div>
+      <div class="step-grid">
+        <article><span>1</span><h3>Weryfikacja po NIP</h3><p>Sprawdź, czy firma istnieje, jest aktywna, zawieszona lub wykreślona przed wystawieniem faktury, podpisaniem umowy albo wysyłką oferty.</p></article>
+        <article><span>2</span><h3>Uzupełnianie CRM</h3><p>Dodawaj nazwę, status, miasto, PKD, stronę WWW i dane kontaktowe do rekordów leadów bez ręcznego przeszukiwania CEIDG.</p></article>
+        <article><span>3</span><h3>Segmentacja leadów</h3><p>Buduj listy firm po województwie, mieście, statusie, głównym PKD, obecności telefonu, emaila albo strony WWW.</p></article>
+        <article><span>4</span><h3>Monitoring kontrahentów</h3><p>Automatycznie odświeżaj status działalności i wykrywaj firmy zawieszone, zakończone lub z istotnymi zmianami danych.</p></article>
+      </div>
+    </section>
+
+    <section class="steps" id="analityka">
+      <div class="section-head"><h2>Analityka zgodna z RODO</h2><p>Endpointy <code>/analytics</code> zwracają wyłącznie agregaty statystyczne, bez NIP, nazwisk, telefonu, emaila i pojedynczych rekordów firm.</p></div>
+      <div class="step-grid">
+        <article><span>PKD</span><h3>Potencjał branży</h3><p>Ile aktywnych firm o PKD 43.21.Z działa w Małopolsce i jaki procent wszystkich firm z tej branży stanowią.</p></article>
+        <article><span>GEO</span><h3>Mapa rynku</h3><p>Ranking województw, powiatów, gmin lub miast według liczby aktywnych firm z wybranego segmentu.</p></article>
+        <article><span>CRM</span><h3>Jakość kontaktu</h3><p>Odsetek firm w segmencie, które mają email, telefon lub stronę WWW, zanim kupisz albo zbudujesz kampanię.</p></article>
+        <article><span>TREND</span><h3>Rocznik działalności</h3><p>Rozkład firm według roku rozpoczęcia działalności, statusu i lokalizacji, np. nowe firmy IT w dużych miastach.</p></article>
+      </div>
+    </section>
+
     <section class="steps">
       <div class="section-head"><h2>Jak działa leadbase.network?</h2><p>Od rejestracji do pierwszego zapytania bez ręcznego obrabiania plików CEIDG.</p></div>
       <div class="step-grid">
@@ -525,10 +548,10 @@ public static class LeadbaseSiteEndpoints
     <section class="pricing" id="cennik">
       <div class="section-head"><h2>Pakiety tokenów</h2><p>Token rozliczamy jako koszt pobranego profilu firmy, a nie każdej pojedynczej kolumny. Dane kontaktowe i raw JSON kosztują więcej, ale podstawowe wyszukiwanie pozostaje tanie.</p></div>
       <div class="price-grid">
-        <article><small>STARTER</small><h3>49 zł</h3><p>50 000 tokenów</p><ul><li>około 50 000 profili podstawowych</li><li>około 25 000 profili z kontaktem</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
-        <article class="featured"><small>GROWTH</small><h3>149 zł</h3><p>250 000 tokenów</p><ul><li>około 250 000 profili podstawowych</li><li>około 125 000 profili z kontaktem</li></ul><a class="button button-primary" href="/register">Wybierz pakiet</a></article>
-        <article><small>SCALE</small><h3>399 zł</h3><p>1 000 000 tokenów</p><ul><li>około 1 000 000 profili podstawowych</li><li>około 500 000 profili z kontaktem</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
-        <article><small>ENTERPRISE</small><h3>999 zł</h3><p>3 000 000 tokenów</p><ul><li>wysoki wolumen</li><li>indywidualne limity i SLA</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj się</a></article>
+        <article><small>STARTER</small><h3>49 zł</h3><p>50 000 tokenów</p><strong class="unit-price">0,98 zł / 1000 tokenów</strong><ul><li>około 50 000 profili podstawowych</li><li>około 25 000 profili z kontaktem</li><li>około 1 020 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article class="featured"><small>GROWTH</small><h3>149 zł</h3><p>250 000 tokenów</p><strong class="unit-price">0,596 zł / 1000 tokenów</strong><ul><li>około 250 000 profili podstawowych</li><li>około 125 000 profili z kontaktem</li><li>około 1 678 tokenów za 1 zł</li></ul><a class="button button-primary" href="/register">Wybierz pakiet</a></article>
+        <article><small>SCALE</small><h3>399 zł</h3><p>1 000 000 tokenów</p><strong class="unit-price">0,399 zł / 1000 tokenów</strong><ul><li>około 1 000 000 profili podstawowych</li><li>około 500 000 profili z kontaktem</li><li>około 2 506 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article><small>ENTERPRISE</small><h3>999 zł</h3><p>3 000 000 tokenów</p><strong class="unit-price">0,333 zł / 1000 tokenów</strong><ul><li>wysoki wolumen</li><li>indywidualne limity i SLA</li><li>około 3 003 tokenów za 1 zł</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj się</a></article>
       </div>
     </section>
 

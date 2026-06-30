@@ -19,7 +19,10 @@ public sealed record RegisterRequest(string Email, string Password, string? Disp
 public sealed record LoginRequest(string Email, string Password, string? KeyName);
 public sealed record ApiKeyResponse(string ApiKey, string KeyPrefix, long TokenBalance);
 public sealed record BalanceResponse(long TokenBalance);
-public sealed record TokenPackageResponse(string Code, string Name, long Tokens, decimal NetPricePln);
+public sealed record TokenPackageResponse(string Code, string Name, long Tokens, decimal NetPricePln, decimal PlnPer1000Tokens, decimal TokensPerPln);
+public sealed record AnalyticsSummaryResponse(long TotalCompanies, long ActiveCompanies, decimal ActivePercent, long SuspendedCompanies, decimal SuspendedPercent, long WithEmail, decimal WithEmailPercent, long WithPhone, decimal WithPhonePercent, long WithWebsite, decimal WithWebsitePercent, long TokenCost, long TokenBalanceAfter);
+public sealed record AnalyticsBucketResponse(string Key, long Companies, long ActiveCompanies, decimal SharePercent);
+public sealed record AnalyticsDistributionResponse(string Dimension, long TotalCompanies, int MinBucketSize, IReadOnlyList<AnalyticsBucketResponse> Buckets, long TokenCost, long TokenBalanceAfter);
 public sealed record CompanySearchResponse(
     int Page,
     int PageSize,
@@ -55,6 +58,7 @@ public static class ProductApiEndpoints
         services.AddSingleton(productOptions);
         services.AddSingleton(_ => NpgsqlDataSource.Create(postgresOptions.ConnectionString));
         services.AddSingleton<ProductApiStore>();
+        services.AddSingleton<ProductAnalyticsStore>();
         return services;
     }
 
@@ -129,14 +133,25 @@ public static class ProductApiEndpoints
 
         var billing = app.MapGroup("/billing").WithTags("Billing");
 
-        billing.MapGet("/token-packages", () => Results.Ok(new[]
-        {
-            new TokenPackageResponse("starter", "Starter", 50_000, 49),
-            new TokenPackageResponse("growth", "Growth", 250_000, 149),
-            new TokenPackageResponse("scale", "Scale", 1_000_000, 399),
-            new TokenPackageResponse("enterprise", "Enterprise", 3_000_000, 999)
-        }))
+        billing.MapGet("/token-packages", () => Results.Ok(ProductPricing.TokenPackages))
         .WithSummary("List available token packages");
+
+        billing.MapGet("/pricing", () => Results.Ok(new
+        {
+            Model = "package-row-cost",
+            RequestBaseCost = 1,
+            ReturnedRowCost = new
+            {
+                BasicProfile = 1,
+                WithAnyContactColumn = 2,
+                WithPkdCodes = 2,
+                WithContactAndPkdCodes = 3,
+                WithRawDetailPayloadExtra = 10
+            },
+            AnalyticsQueryCost = 25,
+            Packages = ProductPricing.TokenPackages
+        }))
+        .WithSummary("Explain current token pricing model");
 
         var companies = app.MapGroup("/companies").WithTags("Companies");
 
@@ -200,6 +215,82 @@ public static class ProductApiEndpoints
                 result.Items));
         })
         .WithSummary("Search CEIDG companies with selectable columns and token billing");
+
+
+        var analytics = app.MapGroup("/analytics").WithTags("Analytics");
+
+        analytics.MapGet("/summary", async (
+            [FromHeader(Name = "X-Api-Key")] string? apiKey,
+            ProductApiStore store,
+            ProductAnalyticsStore analyticsStore,
+            [FromQuery] string? voivodeship,
+            [FromQuery] string? county,
+            [FromQuery] string? municipality,
+            [FromQuery] string? city,
+            [FromQuery] string? status,
+            [FromQuery] string? mainPkdCode,
+            [FromQuery] string? pkdPrefix,
+            [FromQuery] bool? hasEmail,
+            [FromQuery] bool? hasPhone,
+            [FromQuery] bool? hasWebsite,
+            [FromQuery] DateOnly? startedFrom,
+            [FromQuery] DateOnly? startedTo,
+            CancellationToken cancellationToken) =>
+        {
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var result = await analyticsStore.GetSummaryAsync(user.UserId, user.ApiKeyId, filter, cancellationToken);
+            return result.Success
+                ? Results.Ok(result.Data)
+                : Results.Json(new { error = "Insufficient token balance.", requiredTokens = result.TokenCost, currentBalance = result.TokenBalanceAfter }, statusCode: StatusCodes.Status402PaymentRequired);
+        })
+        .WithSummary("Aggregate CEIDG company counts without personal data");
+
+        analytics.MapGet("/distribution", async (
+            [FromHeader(Name = "X-Api-Key")] string? apiKey,
+            ProductApiStore store,
+            ProductAnalyticsStore analyticsStore,
+            [FromQuery] string dimension,
+            [FromQuery] string? voivodeship,
+            [FromQuery] string? county,
+            [FromQuery] string? municipality,
+            [FromQuery] string? city,
+            [FromQuery] string? status,
+            [FromQuery] string? mainPkdCode,
+            [FromQuery] string? pkdPrefix,
+            [FromQuery] bool? hasEmail,
+            [FromQuery] bool? hasPhone,
+            [FromQuery] bool? hasWebsite,
+            [FromQuery] DateOnly? startedFrom,
+            [FromQuery] DateOnly? startedTo,
+            [FromQuery] int limit,
+            [FromQuery] int minBucketSize,
+            CancellationToken cancellationToken) =>
+        {
+            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear" };
+            if (string.IsNullOrWhiteSpace(dimension) || !allowedDimensions.Contains(dimension, StringComparer.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest(new { error = "Unsupported analytics dimension.", allowedDimensions });
+            }
+
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var result = await analyticsStore.GetDistributionAsync(user.UserId, user.ApiKeyId, dimension, filter, limit, minBucketSize, cancellationToken);
+            return result.Success
+                ? Results.Ok(result.Data)
+                : Results.Json(new { error = "Insufficient token balance.", requiredTokens = result.TokenCost, currentBalance = result.TokenBalanceAfter }, statusCode: StatusCodes.Status402PaymentRequired);
+        })
+        .WithSummary("Aggregate CEIDG company distribution by selected dimension");
 
         return app;
     }

@@ -182,6 +182,7 @@ article p, li { color: var(--muted); line-height: 1.55; }
 ul { padding-left: 18px; }
 .price-grid small { color: var(--teal); font-weight: 800; }
 .price-grid h3 { font-size: 32px; margin: 12px 0 6px; }
+.unit-price { display: block; margin: 8px 0 12px; color: #214147; font-size: 13px; line-height: 1.35; }
 .price-grid .featured { border-color: rgba(8, 127, 122, .45); box-shadow: var(--shadow); }
 .price-grid .button { margin-top: 8px; width: 100%; }
 
