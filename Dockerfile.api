@@ -1,0 +1,33 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY CeidgMirror.slnx ./
+COPY src/CeidgMirror.Api/CeidgMirror.Api.csproj src/CeidgMirror.Api/
+COPY src/CeidgMirror.Application/CeidgMirror.Application.csproj src/CeidgMirror.Application/
+COPY src/CeidgMirror.Contracts/CeidgMirror.Contracts.csproj src/CeidgMirror.Contracts/
+COPY src/CeidgMirror.Domain/CeidgMirror.Domain.csproj src/CeidgMirror.Domain/
+COPY src/CeidgMirror.Infrastructure/CeidgMirror.Infrastructure.csproj src/CeidgMirror.Infrastructure/
+COPY src/CeidgMirror.Worker/CeidgMirror.Worker.csproj src/CeidgMirror.Worker/
+COPY tests/CeidgMirror.Tests/CeidgMirror.Tests.csproj tests/CeidgMirror.Tests/
+
+RUN dotnet restore CeidgMirror.slnx
+
+COPY . .
+RUN dotnet publish src/CeidgMirror.Api/CeidgMirror.Api.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-bookworm-slim AS final
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_URLS=http://+:8080
+USER 10001
+
+ENTRYPOINT ["dotnet", "CeidgMirror.Api.dll"]

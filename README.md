@@ -1,35 +1,27 @@
 # CEIDG_API_WRAPER
 
-Private C#/.NET project for building a local PostgreSQL analytical mirror of CEIDG data.
+C#/.NET solution for mirroring CEIDG company data into PostgreSQL and exposing a paid/token-billed API over the local mirror.
 
-The target product is a data platform/API that can ingest CEIDG public business data, preserve raw source payloads, normalize the most important entities into relational tables, and expose clean query/analysis endpoints for downstream services.
+## Projects
 
-## Current Status
-
-The repository contains the CTO plan, CEIDG source documentation copies, and the first .NET solution skeleton:
-
-- `CeidgMirror.Api` - API host for read/query endpoints.
-- `CeidgMirror.Worker` - background ingestion/synchronization host.
-- `CeidgMirror.Application` - orchestration interfaces.
-- `CeidgMirror.Infrastructure` - CEIDG HTTP client, report repository client, and rate pacing.
-- `CeidgMirror.Contracts` - source/API DTO contracts.
-- `CeidgMirror.Domain` - domain model.
+- `CeidgMirror.Worker` - imports CEIDG company ids from `/zmiana`, fetches details from `/firma/{id}`, and upserts rows into PostgreSQL.
+- `CeidgMirror.Api` - Swagger/API host for authenticated users querying the local CEIDG mirror.
+- `CeidgMirror.Infrastructure` - CEIDG HTTP clients, PostgreSQL stores, parsers, request pacing.
+- `CeidgMirror.Application`, `CeidgMirror.Contracts`, `CeidgMirror.Domain` - shared contracts and application abstractions.
 - `CeidgMirror.Tests` - unit tests.
 
-## Source APIs
+## Database Files
 
-- Active CEIDG company API: `https://dane.biznes.gov.pl/api/ceidg/v3`
-- CEIDG report repository: `https://dane.biznes.gov.pl/raporty/`
-- Older CEIDG API v2 documentation remains in the repo, but the former `https://dane.biznes.gov.pl/api/ceidg/v2` context currently returns `404 No context-path matches the request URI`.
-- Legacy CEIDG DataStore SOAP API: documented in `OpisAPINew.pdf`.
+- `db/init/001_schema.sql` - full schema for a new Docker PostgreSQL volume. Docker runs it automatically only on first database initialization.
+- `db/setup_local_database.sql` - creates/updates the local Windows PostgreSQL database `ceidg_mirror`.
+- `db/migrations/*.sql` - incremental SQL migrations for existing databases.
 
-## Key Constraints
+Current schemas/tables:
 
-- CEIDG company API uses JWT bearer authentication in the `Authorization` header.
-- CEIDG enforces request limits: 50 requests per 3 minutes and 1000 requests per 60 minutes.
-- The primary company import flow is `/zmiana` -> `/firma/{id}` so each discovered company is hydrated with a full detail payload.
-- Reports are an auxiliary source and are stored separately in `source.report_payload`.
-- The local PostgreSQL database must retain source fidelity, not only a lossy projection.
+- `ceidg.company_records` - one main row per CEIDG company plus raw JSON payloads.
+- `source.import_run`, `source.import_checkpoint` - import run audit and resumable worker state.
+- `source.report_payload`, `source.report_company_link` - optional report repository data.
+- `app.api_users`, `app.api_keys`, `app.token_ledger`, `app.api_query_log` - API users, API keys and token billing.
 
 ## Build And Test
 
@@ -38,63 +30,58 @@ dotnet build CeidgMirror.slnx
 dotnet test CeidgMirror.slnx --no-build
 ```
 
-## Local PostgreSQL
+## Windows Local Database
 
-```powershell
-docker compose up -d postgres
-```
-
-The development database is created as `ceidg_mirror` with initial schemas from `db/init/001_schema.sql`.
-
-For a local PostgreSQL instance that already exists on Windows, run:
+For your local PostgreSQL 18 on port `5433`:
 
 ```powershell
 $env:PGPASSWORD = "postgres"
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -f db\setup_local_database.sql
 ```
 
-## Import Worker
-
-The worker does not import automatically by default. Enable it explicitly:
+Run a new migration manually, for example:
 
 ```powershell
-$env:CeidgApi__JwtToken = "YOUR_TOKEN"
+$env:PGPASSWORD = "postgres"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5433 -U postgres -d ceidg_mirror -v ON_ERROR_STOP=1 -f db\migrations\20260630_001_product_api.sql
+```
+
+All schema SQL uses `create ... if not exists`, so it is safe to rerun.
+
+## Worker Locally
+
+Use `CeidgMirror.Worker` as the startup project in Visual Studio, not `CeidgMirror.Api`.
+
+PowerShell example:
+
+```powershell
+$env:CeidgApi__JwtToken = "YOUR_CEIDG_TOKEN"
 $env:CeidgApi__BaseUrl = "https://dane.biznes.gov.pl/api/ceidg/v3/"
+$env:Postgres__ConnectionString = "Host=localhost;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
 $env:Import__Enabled = "true"
 $env:Import__RunOnce = "false"
 $env:Import__Source = "ChangesApi"
 $env:Import__ChangesFrom = "2011-07-01"
+$env:Import__ChangesWindowDays = "1"
 $env:Import__MaxPages = "0"
 $env:Import__PageLimit = "50"
 $env:Import__MaxCompanies = "0"
-$env:Postgres__ConnectionString = "Host=localhost;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
 dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 ```
 
-The primary importer reads company ids from `/zmiana`, then fetches full company details from `/firma/{id}`, and finally upserts one row into `ceidg.company_records` with the full `raw_detail_payload`. The older `/firmy` index flow remains available as `Import__Source=RestApi`, but the live production service currently works through the v3 change/detail flow.
+The worker is resumable. Progress is persisted in `source.import_checkpoint` after each processed company. Keep `MaxPages=0` and `MaxCompanies=0` for a full mirror.
 
-For a full mirror, keep `MaxPages=0` and `MaxCompanies=0`. Progress is persisted in `source.import_checkpoint` after each processed company. If the worker is stopped or crashes, the next run resumes from `next_page` and `next_item_index` instead of starting from page 1. With `SkipExistingCompanies=true`, already imported CEIDG ids are skipped without calling `/firma/{id}` again.
+Request pacing:
 
-Request pacing is centralized in `SlidingWindowRequestPacer`:
+- 50 requests / 180 seconds.
+- 1000 requests / 3600 seconds.
+- Smooth interval: `CeidgApi__MinimumRequestIntervalSeconds=4`.
 
-- CEIDG hard windows: 50 requests / 180 seconds and 1000 requests / 3600 seconds.
-- Smooth pacing: `CeidgApi__MinimumRequestIntervalSeconds=4.0`, which keeps the worker below both limits instead of bursting requests.
-- Slow historical pages are allowed by `CeidgApi__RequestTimeoutSeconds=300`.
+## API Locally
 
+Use `CeidgMirror.Api` as the startup project.
 
-## CEIDG Configuration
-
-Set the JWT outside source control, for example:
-
-```powershell
-$env:CeidgApi__JwtToken = "YOUR_TOKEN"
-```
-
-Do not commit real tokens. The current default base URL points to the active CEIDG v3 company API.
-
-## Product API
-
-The API host exposes Swagger UI at:
+Swagger UI:
 
 ```text
 http://localhost:5075/swagger
@@ -102,49 +89,122 @@ http://localhost:5075/swagger
 
 Core endpoints:
 
-- `POST /auth/register` - creates a user, grants free starting tokens, and returns the first API key.
+- `POST /auth/register` - creates a user, grants free starting tokens, returns the first API key.
 - `POST /auth/login` - verifies email/password and issues a new API key.
-- `GET /account/balance` - returns the current token balance; requires `X-Api-Key`.
-- `GET /billing/token-packages` - lists token packages prepared for paid billing integration.
-- `GET /companies/columns` - lists selectable fields and token weights.
-- `GET /companies` - searches CEIDG company rows with pagination and dynamic columns; requires `X-Api-Key`.
+- `GET /account/balance` - requires `X-Api-Key`.
+- `GET /billing/token-packages` - lists token packages for future payment integration.
+- `GET /companies/columns` - lists selectable columns and token weights.
+- `GET /companies` - paginated company search with dynamic columns; requires `X-Api-Key`.
 
-Example company query:
+Example:
 
 ```powershell
 $headers = @{ "X-Api-Key" = "YOUR_API_KEY" }
 Invoke-RestMethod -Headers $headers "http://localhost:5075/companies?page=1&pageSize=25&columns=ceidgId,nip,name,city,email,pkdCodes&city=Warszawa"
 ```
 
-Token cost is calculated from the selected column weights and number of returned rows. The request is rejected with HTTP `402 Payment Required` if the user does not have enough tokens.
+Token cost depends on selected column weights and returned row count. Insufficient balance returns HTTP `402 Payment Required`.
 
-For an existing local database, rerun the setup script after pulling this version so the `app.*` authentication and billing tables are created:
+## Docker On Server
 
-```powershell
-$env:PGPASSWORD = "postgres"
-& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -f db\setup_local_database.sql
-```
-## Docker Worker
+Set secrets in the shell or in an untracked `.env` file. Do not commit real tokens. The worker will start without `CEIDG_JWT_TOKEN`, but CEIDG requests will return `401`; check the startup log for `HasJwtToken=True`.
 
-Build the worker image:
+Example `.env` on the server:
 
-```powershell
-docker build -t ceidg-mirror-worker .
+```env
+CEIDG_JWT_TOKEN=YOUR_CEIDG_TOKEN
+POSTGRES_CONNECTION_STRING=Host=postgres;Port=5432;Database=ceidg_mirror;Username=ceidg;Password=ceidg_dev_password
 ```
 
-Run PostgreSQL and the import worker through Compose:
+Start PostgreSQL only:
 
-```powershell
-$env:CEIDG_JWT_TOKEN = "YOUR_TOKEN"
-docker compose --profile worker up -d --build
+```bash
+docker compose up -d postgres
 ```
 
-The Compose worker connects to the Compose PostgreSQL service with `Host=postgres;Port=5432`. If you want a containerized worker to use your Windows PostgreSQL on port `5433`, override:
+Build images without cache after Dockerfile changes:
 
-```powershell
-$env:Postgres__ConnectionString = "Host=host.docker.internal;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres"
-docker compose --profile worker up -d --build worker
+```bash
+docker compose build --no-cache worker api
 ```
+
+Run worker:
+
+```bash
+docker compose --profile worker up -d worker
+docker logs -f ceidg-mirror-worker
+```
+
+Run API/Swagger:
+
+```bash
+docker compose --profile api up -d api
+docker logs -f ceidg-mirror-api
+```
+
+Swagger is exposed on the host at:
+
+```text
+http://SERVER_IP:5075/swagger
+```
+
+Run PostgreSQL + worker + API together:
+
+```bash
+docker compose --profile worker --profile api up -d --build
+```
+
+If a containerized service should use PostgreSQL installed directly on the host instead of Compose PostgreSQL, set:
+
+```bash
+export POSTGRES_CONNECTION_STRING='Host=host.docker.internal;Port=5433;Database=ceidg_mirror;Username=postgres;Password=postgres'
+```
+
+On Linux, `host.docker.internal` may require Docker's host-gateway configuration. The default Compose setup is simpler: use `Host=postgres` and the bundled `postgres` service.
+
+## Server Troubleshooting
+
+### CEIDG returns 401 Unauthorized
+
+Check worker logs:
+
+```bash
+docker logs ceidg-mirror-worker | grep HasJwtToken
+```
+
+Expected:
+
+```text
+HasJwtToken=True, JwtTokenLength=...
+```
+
+If `HasJwtToken=False`, the container did not receive `CEIDG_JWT_TOKEN`. If it is `True` but CEIDG still returns `401`, the token is invalid, expired, truncated, or contains accidental spaces/newlines.
+
+### Missing libgssapi_krb5.so.2
+
+The worker/API Dockerfiles install `libgssapi-krb5-2`. Rebuild without cache:
+
+```bash
+docker compose build --no-cache worker api
+```
+
+### SQL init did not run in Docker
+
+`db/init/001_schema.sql` runs only when PostgreSQL initializes an empty volume. If the volume already exists, run migrations manually or recreate the volume intentionally.
+
+Manual migration inside Compose PostgreSQL:
+
+```bash
+docker compose exec -T postgres psql -U ceidg -d ceidg_mirror < db/migrations/20260630_001_product_api.sql
+```
+
+## Security Notes
+
+- Do not commit CEIDG JWTs, API keys, user passwords or `.env` files.
+- `appsettings.Local.json`, `.env`, `.env.*` and `secrets.json` are ignored by git.
+- User API keys are stored as SHA-256 hashes in `app.api_keys`.
+- User passwords are stored as PBKDF2-SHA256 hashes.
+
 ## Documents
 
 - [CTO plan](docs/CTO_PLAN.md)

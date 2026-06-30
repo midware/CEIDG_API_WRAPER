@@ -31,7 +31,7 @@ services:
       DOTNET_ENVIRONMENT: Production
       CeidgApi__BaseUrl: https://dane.biznes.gov.pl/api/ceidg/v3/
       CeidgApi__ReportsBaseUrl: https://dane.biznes.gov.pl/raporty/
-      CeidgApi__JwtToken: ${CEIDG_JWT_TOKEN:?Set CEIDG_JWT_TOKEN in your shell or .env file}
+      CeidgApi__JwtToken: ${CEIDG_JWT_TOKEN:-}
       CeidgApi__RequestLimit: 50
       CeidgApi__WindowSeconds: 180
       CeidgApi__HourlyRequestLimit: 1000
@@ -52,6 +52,30 @@ services:
       Import__MaxCompanies: 0
       Import__LoopDelayMinutes: 60
       Import__FailureRetryDelayMinutes: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ceidg-mirror-api
+    profiles:
+      - api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      CeidgApi__BaseUrl: https://dane.biznes.gov.pl/api/ceidg/v3/
+      CeidgApi__ReportsBaseUrl: https://dane.biznes.gov.pl/raporty/
+      CeidgApi__JwtToken: ${CEIDG_JWT_TOKEN:-}
+      Postgres__ConnectionString: ${POSTGRES_CONNECTION_STRING:-Host=postgres;Port=5432;Database=ceidg_mirror;Username=ceidg;Password=ceidg_dev_password}
+      ProductApi__FreeRegistrationTokens: 1000
+      ProductApi__DefaultPageSize: 25
+      ProductApi__MaxPageSize: 100
+    ports:
+      - "5075:8080"
     restart: unless-stopped
 
 volumes:
