@@ -31,7 +31,7 @@ public static class LeadbaseSiteEndpoints
             var rows = DemoCompanies.Where(company =>
                 Matches(company.Name, name) &&
                 Matches(company.City, city) &&
-                Matches(company.Pkd, mainPkdCode)).Take(10).ToArray();
+                Matches(company.MainPkdCode, mainPkdCode)).Take(10).ToArray();
 
             return Results.Ok(new
             {
@@ -61,7 +61,7 @@ public static class LeadbaseSiteEndpoints
 
     private static string[] ResolveDemoColumns(string? columns)
     {
-        var allowed = new[] { "nip", "name", "city", "email", "www", "pkd", "status" };
+        var allowed = new[] { "ceidgId", "nip", "regon", "name", "status", "ownerFirstName", "ownerLastName", "city", "voivodeship", "street", "postalCode", "mainPkdCode", "phone", "email", "website", "pkdCodes", "rawDetailPayload" };
         if (string.IsNullOrWhiteSpace(columns))
         {
             return allowed;
@@ -81,13 +81,23 @@ public static class LeadbaseSiteEndpoints
         {
             result[column] = column.ToLowerInvariant() switch
             {
+                "ceidgid" => row.CeidgId,
                 "nip" => row.Nip,
+                "regon" => row.Regon,
                 "name" => row.Name,
-                "city" => row.City,
-                "email" => row.Email,
-                "www" => row.Www,
-                "pkd" => row.Pkd,
                 "status" => row.Status,
+                "ownerfirstname" => row.OwnerFirstName,
+                "ownerlastname" => row.OwnerLastName,
+                "city" => row.City,
+                "voivodeship" => row.Voivodeship,
+                "street" => row.Street,
+                "postalcode" => row.PostalCode,
+                "mainpkdcode" => row.MainPkdCode,
+                "phone" => row.Phone,
+                "email" => row.Email,
+                "website" => row.Website,
+                "pkdcodes" => row.PkdCodes,
+                "rawdetailpayload" => row.RawDetailPayload,
                 _ => null
             };
         }
@@ -97,14 +107,14 @@ public static class LeadbaseSiteEndpoints
 
     private static readonly DemoCompany[] DemoCompanies =
     [
-        new("7312045678", "FIRMA ABC JAN KOWALSKI", "Warszawa", "biuro@firmaabc.pl", "firmaabc.pl", "62.01.Z", "Aktywny"),
-        new("9491832736", "PV SOLUTIONS SPOLKA Z O.O.", "Krakow", "kontakt@pvsolutions.pl", "pvsolutions.pl", "43.21.Z", "Aktywny"),
-        new("8762459076", "SUN ENERGY S.C.", "Gdansk", "biuro@sunenergy.pl", "sunenergy.pl", "43.21.Z", "Aktywny"),
-        new("5223001189", "EKO INSTALACJE DARIUSZ NOWAK", "Poznan", "d.nowak@ekoinstalacje.pl", "ekoinstalacje.pl", "43.21.Z", "Zawieszony"),
-        new("1132894410", "SOFTWARE LAB ANNA WISNIEWSKA", "Warszawa", "hello@softwarelab.pl", "softwarelab.pl", "62.02.Z", "Aktywny")
+        new("b18d8d43-4e20-49c0-8e21-000000000001", "7312045678", "141234567", "FIRMA ABC JAN KOWALSKI", "Aktywny", "Jan", "Kowalski", "Warszawa", "mazowieckie", "Marszalkowska 10", "00-590", "62.01.Z", "+48 501 100 200", "biuro@firmaabc.pl", "firmaabc.pl", "[\"62.01.Z\",\"62.02.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
+        new("b18d8d43-4e20-49c0-8e21-000000000002", "9491832736", "122334455", "PV SOLUTIONS SPOLKA Z O.O.", "Aktywny", "Anna", "Nowak", "Krakow", "malopolskie", "Dluga 8", "31-146", "43.21.Z", "+48 512 333 444", "kontakt@pvsolutions.pl", "pvsolutions.pl", "[\"43.21.Z\",\"35.11.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
+        new("b18d8d43-4e20-49c0-8e21-000000000003", "8762459076", "987654321", "SUN ENERGY S.C.", "Aktywny", "Piotr", "Zielinski", "Gdansk", "pomorskie", "Grunwaldzka 22", "80-236", "43.21.Z", "+48 533 220 110", "biuro@sunenergy.pl", "sunenergy.pl", "[\"43.21.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
+        new("b18d8d43-4e20-49c0-8e21-000000000004", "5223001189", "556677889", "EKO INSTALACJE DARIUSZ NOWAK", "Zawieszony", "Dariusz", "Nowak", "Poznan", "wielkopolskie", "Polna 5", "60-535", "43.21.Z", "+48 600 700 800", "d.nowak@ekoinstalacje.pl", "ekoinstalacje.pl", "[\"43.21.Z\",\"71.12.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
+        new("b18d8d43-4e20-49c0-8e21-000000000005", "1132894410", "101202303", "SOFTWARE LAB ANNA WISNIEWSKA", "Aktywny", "Anna", "Wisniewska", "Warszawa", "mazowieckie", "Prosta 51", "00-838", "62.02.Z", "+48 577 101 202", "hello@softwarelab.pl", "softwarelab.pl", "[\"62.02.Z\",\"63.11.Z\"]", "{\"source\":\"demo\",\"contact\":true}")
     ];
 
-    private sealed record DemoCompany(string Nip, string Name, string City, string Email, string Www, string Pkd, string Status);
+    private sealed record DemoCompany(string CeidgId, string Nip, string Regon, string Name, string Status, string OwnerFirstName, string OwnerLastName, string City, string Voivodeship, string Street, string PostalCode, string MainPkdCode, string Phone, string Email, string Website, string PkdCodes, string RawDetailPayload);
     private const string HomeHtml = """
 <!doctype html>
 <html lang="pl">
@@ -195,13 +205,23 @@ public static class LeadbaseSiteEndpoints
           <label>API key dla konta<input name="apiKey" placeholder="Opcjonalnie: ceidg_..."></label>
           <fieldset>
             <legend>Zwracane kolumny</legend>
+            <label><input type="checkbox" name="columns" value="ceidgId"> CEIDG ID</label>
             <label><input type="checkbox" name="columns" value="nip" checked> NIP</label>
+            <label><input type="checkbox" name="columns" value="regon"> REGON</label>
             <label><input type="checkbox" name="columns" value="name" checked> Nazwa</label>
-            <label><input type="checkbox" name="columns" value="city" checked> Miasto</label>
-            <label><input type="checkbox" name="columns" value="email" checked> Email</label>
-            <label><input type="checkbox" name="columns" value="www" checked> WWW</label>
-            <label><input type="checkbox" name="columns" value="pkd" checked> PKD</label>
             <label><input type="checkbox" name="columns" value="status" checked> Status</label>
+            <label><input type="checkbox" name="columns" value="ownerFirstName"> Imiê w³aœciciela</label>
+            <label><input type="checkbox" name="columns" value="ownerLastName"> Nazwisko w³aœciciela</label>
+            <label><input type="checkbox" name="columns" value="city" checked> Miasto</label>
+            <label><input type="checkbox" name="columns" value="voivodeship"> Województwo</label>
+            <label><input type="checkbox" name="columns" value="street"> Ulica</label>
+            <label><input type="checkbox" name="columns" value="postalCode"> Kod pocztowy</label>
+            <label><input type="checkbox" name="columns" value="mainPkdCode" checked> G³ówne PKD</label>
+            <label><input type="checkbox" name="columns" value="phone" checked> Telefon</label>
+            <label><input type="checkbox" name="columns" value="email" checked> Email</label>
+            <label><input type="checkbox" name="columns" value="website" checked> WWW</label>
+            <label><input type="checkbox" name="columns" value="pkdCodes"> Wszystkie PKD</label>
+            <label><input type="checkbox" name="columns" value="rawDetailPayload"> Raw JSON</label>
           </fieldset>
           <button class="button button-primary button-large" type="submit">Testuj endpoint</button>
           <p class="lab-note" id="demo-counter">Demo: 2 darmowe zapytania bez konta.</p>

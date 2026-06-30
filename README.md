@@ -107,7 +107,7 @@ Invoke-RestMethod -Headers $headers "http://localhost:5075/companies?page=1&page
 
 Token cost depends on selected column weights and returned row count. Insufficient balance returns HTTP `402 Payment Required`.
 
-The product website includes a graphical endpoint tester. Anonymous visitors can run 2 demo calls. After that, the UI requires registration or an API key.
+The product website includes a graphical endpoint tester. Anonymous visitors can run 2 demo calls. After that, the UI requires registration or an API key. The tester exposes the full selectable company column set, including contact, address, owner, PKD and raw payload fields.
 
 ## Docker On Server
 
@@ -217,4 +217,5 @@ docker compose exec -T postgres psql -U ceidg -d ceidg_mirror < db/migrations/20
 
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
+- [leadbase.network product roadmap](docs/LEADBASE_PRODUCT_ROADMAP.md)
 
