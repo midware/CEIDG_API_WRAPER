@@ -21,14 +21,10 @@ RUN dotnet publish src/CeidgMirror.Worker/CeidgMirror.Worker.csproj \
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
 WORKDIR /app
 
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home /app \
-    --uid 10001 \
-    ceidg
-
 COPY --from=build /app/publish .
-USER ceidg
+
+# Use a numeric non-root UID so the image works with minimal runtime images
+# that do not include adduser/useradd.
+USER 10001
 
 ENTRYPOINT ["dotnet", "CeidgMirror.Worker.dll"]
