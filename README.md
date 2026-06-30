@@ -93,6 +93,8 @@ Core endpoints:
 - `POST /auth/login` - verifies email/password and issues a new API key.
 - `GET /account/balance` - requires `X-Api-Key`.
 - `GET /billing/token-packages` - lists token packages for future payment integration.
+- `GET /` - leadbase.network product website.
+- `GET /docs` - redirects to Swagger documentation.
 - `GET /companies/columns` - lists selectable columns and token weights.
 - `GET /companies` - paginated company search with dynamic columns; requires `X-Api-Key`.
 
@@ -213,5 +215,4 @@ docker compose exec -T postgres psql -U ceidg -d ceidg_mirror < db/migrations/20
 
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
-
 

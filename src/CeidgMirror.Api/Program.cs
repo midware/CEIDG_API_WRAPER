@@ -12,9 +12,9 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "CEIDG Mirror API",
+        Title = "leadbase.network API",
         Version = "v1",
-        Description = "Authenticated API for querying the local CEIDG PostgreSQL mirror with token-based billing."
+        Description = "Authenticated API for querying leadbase.network company data with token-based billing."
     });
     options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
     {
@@ -30,16 +30,17 @@ builder.Services.AddProductApi(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseStaticFiles();
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "CEIDG Mirror API v1");
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "leadbase.network API v1");
     options.RoutePrefix = "swagger";
 });
 app.MapOpenApi();
 app.MapProductApi();
-
-app.MapGet("/", () => Results.Redirect("/swagger"));
+app.MapLeadbaseSite();
 
 app.MapGet("/health", () => Results.Ok(new
 {
@@ -73,3 +74,4 @@ static void AddLocalSettings(IConfigurationBuilder configuration, string project
         configuration.AddJsonFile(path, optional: true, reloadOnChange: true);
     }
 }
+
