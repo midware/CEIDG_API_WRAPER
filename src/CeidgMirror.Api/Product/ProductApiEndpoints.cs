@@ -31,7 +31,19 @@ public sealed record CompanySearchResponse(
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Items);
 
 public sealed record ApiUserContext(Guid UserId, string Email, long TokenBalance);
-public sealed record AccountPanel(Guid UserId, string Email, long TokenBalance, int ApiKeyCount, long QueryCount);
+public sealed record AccountPanel(
+    Guid UserId,
+    string Email,
+    long TokenBalance,
+    int ApiKeyCount,
+    long QueryCount,
+    IReadOnlyList<AccountApiKey> ApiKeys,
+    IReadOnlyList<AccountLedgerEntry> Ledger,
+    IReadOnlyList<AccountQueryLog> QueryLogs);
+
+public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc);
+public sealed record AccountLedgerEntry(DateTimeOffset CreatedAtUtc, long Delta, long BalanceAfter, string Reason);
+public sealed record AccountQueryLog(DateTimeOffset CreatedAtUtc, string Endpoint, IReadOnlyList<string> SelectedColumns, int ReturnedRows, long TokenCost);
 
 public static class ProductApiEndpoints
 {
@@ -370,7 +382,91 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             return null;
         }
 
-        return new AccountPanel(reader.GetGuid(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt32(3), reader.GetInt64(4));
+        var summary = new
+        {
+            UserId = reader.GetGuid(0),
+            Email = reader.GetString(1),
+            TokenBalance = reader.GetInt64(2),
+            ApiKeyCount = reader.GetInt32(3),
+            QueryCount = reader.GetInt64(4)
+        };
+        await reader.DisposeAsync();
+
+        var apiKeys = new List<AccountApiKey>();
+        await using (var keysCommand = dataSource.CreateCommand("""
+            select id, key_prefix, name, created_at_utc, last_used_at_utc
+            from app.api_keys
+            where user_id = $1
+              and revoked_at_utc is null
+            order by created_at_utc desc
+            limit 10
+            """))
+        {
+            keysCommand.Parameters.AddWithValue(userId);
+            await using var keysReader = await keysCommand.ExecuteReaderAsync(cancellationToken);
+            while (await keysReader.ReadAsync(cancellationToken))
+            {
+                apiKeys.Add(new AccountApiKey(
+                    keysReader.GetGuid(0),
+                    keysReader.GetString(1),
+                    await keysReader.IsDBNullAsync(2, cancellationToken) ? null : keysReader.GetString(2),
+                    keysReader.GetFieldValue<DateTimeOffset>(3),
+                    await keysReader.IsDBNullAsync(4, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(4)));
+            }
+        }
+
+        var ledger = new List<AccountLedgerEntry>();
+        await using (var ledgerCommand = dataSource.CreateCommand("""
+            select created_at_utc, delta, balance_after, reason
+            from app.token_ledger
+            where user_id = $1
+            order by created_at_utc desc
+            limit 10
+            """))
+        {
+            ledgerCommand.Parameters.AddWithValue(userId);
+            await using var ledgerReader = await ledgerCommand.ExecuteReaderAsync(cancellationToken);
+            while (await ledgerReader.ReadAsync(cancellationToken))
+            {
+                ledger.Add(new AccountLedgerEntry(
+                    ledgerReader.GetFieldValue<DateTimeOffset>(0),
+                    ledgerReader.GetInt64(1),
+                    ledgerReader.GetInt64(2),
+                    ledgerReader.GetString(3)));
+            }
+        }
+
+        var queryLogs = new List<AccountQueryLog>();
+        await using (var logsCommand = dataSource.CreateCommand("""
+            select created_at_utc, endpoint, selected_columns, returned_rows, token_cost
+            from app.api_query_log
+            where user_id = $1
+            order by created_at_utc desc
+            limit 10
+            """))
+        {
+            logsCommand.Parameters.AddWithValue(userId);
+            await using var logsReader = await logsCommand.ExecuteReaderAsync(cancellationToken);
+            while (await logsReader.ReadAsync(cancellationToken))
+            {
+                queryLogs.Add(new AccountQueryLog(
+                    logsReader.GetFieldValue<DateTimeOffset>(0),
+                    logsReader.GetString(1),
+                    logsReader.GetFieldValue<string[]>(2),
+                    logsReader.GetInt32(3),
+                    logsReader.GetInt64(4)));
+            }
+        }
+
+        return new AccountPanel(
+            summary.UserId,
+            summary.Email,
+            summary.TokenBalance,
+            summary.ApiKeyCount,
+            summary.QueryCount,
+            apiKeys,
+            ledger,
+            queryLogs);
     }
     public async Task<ApiUserContext?> GetUserByApiKeyAsync(string apiKey, CancellationToken cancellationToken)
     {

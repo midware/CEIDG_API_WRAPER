@@ -31,6 +31,21 @@ public static class LeadbaseSiteEndpoints
         })
         .ExcludeFromDescription();
 
+        app.MapPost("/app/api-keys", async (HttpContext context, ProductApiStore store, CancellationToken cancellationToken) =>
+        {
+            var userId = GetSignedInUserId(context);
+            if (userId is null)
+            {
+                return Results.Redirect("/login");
+            }
+
+            var form = await context.Request.ReadFormAsync(cancellationToken);
+            var keyName = form["keyName"].ToString().Trim();
+            var created = await store.CreateApiKeyAsync(userId.Value, string.IsNullOrWhiteSpace(keyName) ? "Panel" : keyName, cancellationToken);
+            return Results.Content(RenderCreatedApiKeyHtml(created.ApiKey, created.KeyPrefix), "text/html; charset=utf-8");
+        })
+        .ExcludeFromDescription();
+
         app.MapGet("/demo/companies", (HttpContext context, string? name, string? city, string? mainPkdCode, string? columns) =>
         {
             var key = GetAnonymousDemoKey(context);
@@ -68,11 +83,11 @@ public static class LeadbaseSiteEndpoints
         var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
         var email = context.User.FindFirstValue(ClaimTypes.Email) ?? context.User.Identity?.Name ?? "konto";
         var headerActions = isAuthenticated
-            ? $"<a class=\"button button-ghost\" href=\"/app\">Panel</a><a class=\"button button-primary\" href=\"/logout\">Wyloguj siê</a>"
-            : "<a class=\"button button-ghost\" href=\"/login\">Logowanie</a><a class=\"button button-primary\" href=\"/register\">Utwórz konto</a>";
+            ? $"<a class=\"button button-ghost\" href=\"/app\">Panel</a><a class=\"button button-primary\" href=\"/logout\">Wyloguj siÄ™</a>"
+            : "<a class=\"button button-ghost\" href=\"/login\">Logowanie</a><a class=\"button button-primary\" href=\"/register\">UtwÃ³rz konto</a>";
         var heroActions = isAuthenticated
-            ? $"<a class=\"button button-primary button-large\" href=\"/app\">PrzejdŸ do panelu</a><a class=\"button button-secondary button-large\" href=\"/logout\">Wyloguj siê</a>"
-            : "<a class=\"button button-primary button-large\" href=\"/register\">Utwórz konto</a><a class=\"button button-secondary button-large\" href=\"/swagger\">Zobacz Swagger</a>";
+            ? $"<a class=\"button button-primary button-large\" href=\"/app\">PrzejdÅº do panelu</a><a class=\"button button-secondary button-large\" href=\"/logout\">Wyloguj siÄ™</a>"
+            : "<a class=\"button button-primary button-large\" href=\"/register\">UtwÃ³rz konto</a><a class=\"button button-secondary button-large\" href=\"/swagger\">Zobacz Swagger</a>";
         var accountLabel = isAuthenticated ? $"<span class=\"account-chip\">{Html(email)}</span>" : string.Empty;
 
         return HomeHtml
@@ -100,35 +115,123 @@ public static class LeadbaseSiteEndpoints
   <header class="site-header">
     <a class="brand" href="/"><span class="brand-mark">lb</span><span>leadbase.network</span></a>
     <nav class="nav"><a href="/app">Panel</a><a href="/swagger">Dokumentacja</a><a href="/#tester">Tester</a></nav>
-    <div class="header-actions"><span class="account-chip">{Html(account.Email)}</span><a class="button button-primary" href="/logout">Wyloguj siê</a></div>
+    <div class="header-actions"><span class="account-chip">{Html(account.Email)}</span><a class="button button-primary" href="/logout">Wyloguj siÄ™</a></div>
   </header>
   <main class="real-app-shell">
     <section class="real-app-head">
-      <div><h1>Panel u¿ytkownika</h1><p>Saldo tokenów, klucze API i historia u¿ycia bêd¹ rozwijane w kolejnych krokach.</p></div>
-      <a class="button button-secondary" href="/#tester">Testuj endpoint</a>
+      <div><h1>Panel uÅ¼ytkownika</h1><p>ZarzÄ…dzaj kluczami API, tokenami i historiÄ… uÅ¼ycia leadbase.network.</p></div>
+      <a class="button button-secondary" href="/swagger">Dokumentacja API</a>
     </section>
     <section class="metrics app-metrics">
       <article><span>Email</span><b>{Html(account.Email)}</b></article>
-      <article><span>Dostêpne tokeny</span><b>{account.TokenBalance:N0}</b></article>
-      <article><span>Klucze API</span><b>{account.ApiKeyCount}</b></article>
-      <article><span>Zapytania</span><b>{account.QueryCount}</b></article>
+      <article><span>DostÄ™pne tokeny</span><b>{account.TokenBalance:N0}</b></article>
+      <article><span>Aktywne klucze API</span><b>{account.ApiKeyCount}</b></article>
+      <article><span>Zapytania API</span><b>{account.QueryCount}</b></article>
     </section>
     <section class="dashboard-frame real-app-frame">
-      <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Tokeny</a><a>Klucze API</a><a>Historia u¿ycia</a><a>Faktury</a></aside>
-      <div class="dash-main">
-        <h2>Najbli¿sze modu³y</h2>
-        <div class="panel-list">
-          <div><strong>Klucze API</strong><span>Tworzenie, nazwy, cofanie i ostatnie u¿ycie.</span></div>
-          <div><strong>Token ledger</strong><span>Pe³na historia zu¿ycia i do³adowañ.</span></div>
-          <div><strong>P³atnoœci</strong><span>Zakup pakietów tokenów i faktury.</span></div>
-          <div><strong>CRM</strong><span>Listy leadów, notatki oraz kampanie email/SMS.</span></div>
-        </div>
+      <aside><strong>leadbase</strong><a href="#summary">Podsumowanie</a><a href="#api-keys">Klucze API</a><a href="#tokens">Tokeny</a><a href="#usage">Historia uÅ¼ycia</a><a href="/swagger">Swagger</a></aside>
+      <div class="dash-main account-dashboard">
+        <section class="panel-section" id="api-keys">
+          <div class="panel-section-head"><div><h2>Klucze API</h2><p>PeÅ‚ny klucz pokazujemy tylko raz po utworzeniu. W bazie przechowujemy hash oraz prefiks.</p></div></div>
+          <form class="key-create-form" method="post" action="/app/api-keys">
+            <label>Nazwa klucza <input name="keyName" maxlength="80" placeholder="np. Integracja CRM" autocomplete="off"></label>
+            <button class="button button-primary" type="submit">UtwÃ³rz klucz</button>
+          </form>
+          {RenderApiKeys(account.ApiKeys)}
+        </section>
+        <section class="panel-section" id="tokens">
+          <div class="panel-section-head"><div><h2>Tokeny</h2><p>Ostatnie obciÄ…Å¼enia i doÅ‚adowania salda.</p></div></div>
+          {RenderLedger(account.Ledger)}
+        </section>
+        <section class="panel-section" id="usage">
+          <div class="panel-section-head"><div><h2>Historia uÅ¼ycia API</h2><p>Ostatnie zapytania z kosztem tokenowym i wybranymi kolumnami.</p></div></div>
+          {RenderQueryLogs(account.QueryLogs)}
+        </section>
       </div>
     </section>
   </main>
 </body>
 </html>
 """;
+
+    private static string RenderCreatedApiKeyHtml(string apiKey, string keyPrefix) => $"""
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nowy klucz API - leadbase.network</title>
+  <link rel="stylesheet" href="/leadbase.css">
+</head>
+<body class="account-page">
+  <main class="account-shell">
+    <section class="account-form api-key-created">
+      <h1>Klucz API zostaÅ‚ utworzony</h1>
+      <p>Zapisz go teraz w bezpiecznym miejscu. Po opuszczeniu tej strony widoczny bÄ™dzie tylko prefiks.</p>
+      <div class="one-time-key"><span>Prefiks</span><strong>{Html(keyPrefix)}</strong></div>
+      <code>{Html(apiKey)}</code>
+      <a class="button button-primary" href="/app">WrÃ³Ä‡ do panelu</a>
+    </section>
+  </main>
+</body>
+</html>
+""";
+
+    private static string RenderApiKeys(IReadOnlyList<AccountApiKey> apiKeys)
+    {
+        if (apiKeys.Count == 0)
+        {
+            return "<div class=\"empty-state\">Nie masz jeszcze aktywnych kluczy API.</div>";
+        }
+
+        return """
+          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Nazwa</th><th>Prefiks</th><th>Utworzony</th><th>Ostatnie uÅ¼ycie</th></tr></thead><tbody>
+""" + string.Join(string.Empty, apiKeys.Select(key => $"""
+            <tr><td>{Html(key.Name ?? "Bez nazwy")}</td><td><code>{Html(key.KeyPrefix)}</code></td><td>{FormatDate(key.CreatedAtUtc)}</td><td>{FormatDate(key.LastUsedAtUtc)}</td></tr>
+""")) + """
+          </tbody></table></div>
+""";
+    }
+
+    private static string RenderLedger(IReadOnlyList<AccountLedgerEntry> ledger)
+    {
+        if (ledger.Count == 0)
+        {
+            return "<div class=\"empty-state\">Brak operacji tokenowych dla tego konta.</div>";
+        }
+
+        return """
+          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Data</th><th>PowÃ³d</th><th>Zmiana</th><th>Saldo po</th></tr></thead><tbody>
+""" + string.Join(string.Empty, ledger.Select(entry => $"""
+            <tr><td>{FormatDate(entry.CreatedAtUtc)}</td><td>{Html(ReasonLabel(entry.Reason))}</td><td class="{(entry.Delta < 0 ? "negative" : "positive")}">{entry.Delta:+#,0;-#,0;0}</td><td>{entry.BalanceAfter:N0}</td></tr>
+""")) + """
+          </tbody></table></div>
+""";
+    }
+
+    private static string RenderQueryLogs(IReadOnlyList<AccountQueryLog> logs)
+    {
+        if (logs.Count == 0)
+        {
+            return "<div class=\"empty-state\">Brak wykonanych zapytaÅ„ API.</div>";
+        }
+
+        return """
+          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Data</th><th>Endpoint</th><th>Kolumny</th><th>Wiersze</th><th>Koszt</th></tr></thead><tbody>
+""" + string.Join(string.Empty, logs.Select(log => $"""
+            <tr><td>{FormatDate(log.CreatedAtUtc)}</td><td>{Html(log.Endpoint)}</td><td>{Html(string.Join(", ", log.SelectedColumns))}</td><td>{log.ReturnedRows:N0}</td><td>{log.TokenCost:N0}</td></tr>
+""")) + """
+          </tbody></table></div>
+""";
+    }
+
+    private static string FormatDate(DateTimeOffset? value) => value is null ? "-" : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    private static string ReasonLabel(string reason) => reason switch
+    {
+        "registration_grant" => "Pakiet startowy",
+        "company_search" => "Zapytanie do firm",
+        _ => reason
+    };
 
     private static string Html(string? value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
     private static string GetAnonymousDemoKey(HttpContext context)
@@ -204,7 +307,7 @@ public static class LeadbaseSiteEndpoints
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>leadbase.network - API danych firm z CEIDG</title>
-  <meta name="description" content="leadbase.network udostêpnia dane firm z CEIDG przez API rozliczane tokenami. Wybieraj kolumny, filtruj rekordy i p³aæ za realnie u¿yte dane.">
+  <meta name="description" content="leadbase.network udostÄ™pnia dane firm z CEIDG przez API rozliczane tokenami. Wybieraj kolumny, filtruj rekordy i pÅ‚aÄ‡ za realnie uÅ¼yte dane.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -216,7 +319,7 @@ public static class LeadbaseSiteEndpoints
       <span class="brand-mark">lb</span>
       <span>leadbase.network</span>
     </a>
-    <nav class="nav" aria-label="G³ówna nawigacja">
+    <nav class="nav" aria-label="GÅ‚Ã³wna nawigacja">
       <a href="#produkt">Produkt</a>
       <a href="#api">API</a>
       <a href="#cennik">Cennik</a>
@@ -225,7 +328,7 @@ public static class LeadbaseSiteEndpoints
     </nav>
     <div class="header-actions">
       <a class="button button-ghost" href="/swagger">Swagger</a>
-      <a class="button button-primary" href="/register">Utwórz konto</a>
+      <a class="button button-primary" href="/register">UtwÃ³rz konto</a>
     </div>
   </header>
 
@@ -233,20 +336,20 @@ public static class LeadbaseSiteEndpoints
     <section class="hero" id="produkt">
       <div class="hero-copy">
         <h1>Dane firm z CEIDG przez API rozliczane tokenami</h1>
-        <p>Wyszukuj firmy, wybieraj dok³adnie te kolumny, których potrzebujesz, korzystaj ze stronicowanego API i p³aæ tylko za realnie pobrane dane.</p>
+        <p>Wyszukuj firmy, wybieraj dokÅ‚adnie te kolumny, ktÃ³rych potrzebujesz, korzystaj ze stronicowanego API i pÅ‚aÄ‡ tylko za realnie pobrane dane.</p>
         <div class="hero-actions">
-          <a class="button button-primary button-large" href="/register">Utwórz konto</a>
+          <a class="button button-primary button-large" href="/register">UtwÃ³rz konto</a>
           <a class="button button-secondary button-large" href="/swagger">Zobacz Swagger</a>
         </div>
-        <div class="proof-grid" aria-label="Najwa¿niejsze funkcje">
+        <div class="proof-grid" aria-label="NajwaÅ¼niejsze funkcje">
           <div><strong>Dane z CEIDG</strong><span>lokalny mirror PostgreSQL</span></div>
-          <div><strong>Wybór kolumn</strong><span>ni¿szy koszt zapytañ</span></div>
-          <div><strong>Paginacja</strong><span>kontrola du¿ych wyników</span></div>
-          <div><strong>Tokeny</strong><span>rozliczenie za u¿ycie</span></div>
+          <div><strong>WybÃ³r kolumn</strong><span>niÅ¼szy koszt zapytaÅ„</span></div>
+          <div><strong>Paginacja</strong><span>kontrola duÅ¼ych wynikÃ³w</span></div>
+          <div><strong>Tokeny</strong><span>rozliczenie za uÅ¼ycie</span></div>
         </div>
       </div>
 
-      <div class="hero-product" id="api" aria-label="Podgl¹d API leadbase.network">
+      <div class="hero-product" id="api" aria-label="PodglÄ…d API leadbase.network">
         <div class="code-window">
           <div class="window-bar"><span>GET</span><code>/companies?columns=nip,name,email,www,pkd</code><b>200 OK</b></div>
           <pre>{
@@ -269,7 +372,7 @@ public static class LeadbaseSiteEndpoints
           <span>Twoje tokeny</span>
           <strong>12 450</strong>
           <div class="meter"><i></i></div>
-          <dl><dt>Zu¿yte w miesi¹cu</dt><dd>7 550</dd><dt>Pozosta³e</dt><dd>12 450</dd></dl>
+          <dl><dt>ZuÅ¼yte w miesiÄ…cu</dt><dd>7 550</dd><dt>PozostaÅ‚e</dt><dd>12 450</dd></dl>
         </aside>
       </div>
     </section>
@@ -292,13 +395,13 @@ public static class LeadbaseSiteEndpoints
             <label><input type="checkbox" name="columns" value="regon"> REGON</label>
             <label><input type="checkbox" name="columns" value="name" checked> Nazwa</label>
             <label><input type="checkbox" name="columns" value="status" checked> Status</label>
-            <label><input type="checkbox" name="columns" value="ownerFirstName"> Imiê w³aœciciela</label>
-            <label><input type="checkbox" name="columns" value="ownerLastName"> Nazwisko w³aœciciela</label>
+            <label><input type="checkbox" name="columns" value="ownerFirstName"> ImiÄ™ wÅ‚aÅ›ciciela</label>
+            <label><input type="checkbox" name="columns" value="ownerLastName"> Nazwisko wÅ‚aÅ›ciciela</label>
             <label><input type="checkbox" name="columns" value="city" checked> Miasto</label>
-            <label><input type="checkbox" name="columns" value="voivodeship"> Województwo</label>
+            <label><input type="checkbox" name="columns" value="voivodeship"> WojewÃ³dztwo</label>
             <label><input type="checkbox" name="columns" value="street"> Ulica</label>
             <label><input type="checkbox" name="columns" value="postalCode"> Kod pocztowy</label>
-            <label><input type="checkbox" name="columns" value="mainPkdCode" checked> G³ówne PKD</label>
+            <label><input type="checkbox" name="columns" value="mainPkdCode" checked> GÅ‚Ã³wne PKD</label>
             <label><input type="checkbox" name="columns" value="phone" checked> Telefon</label>
             <label><input type="checkbox" name="columns" value="email" checked> Email</label>
             <label><input type="checkbox" name="columns" value="website" checked> WWW</label>
@@ -311,46 +414,46 @@ public static class LeadbaseSiteEndpoints
         <div class="endpoint-result">
           <div class="result-toolbar"><span id="result-status">Gotowy do testu</span><code id="result-url">GET /demo/companies</code></div>
           <div class="table-wrap"><table id="endpoint-table"><thead></thead><tbody></tbody></table></div>
-          <pre id="result-json">Wynik zapytania pojawi siê tutaj.</pre>
+          <pre id="result-json">Wynik zapytania pojawi siÄ™ tutaj.</pre>
         </div>
       </div>
       <div class="register-gate" id="register-gate" hidden>
-        <div><h3>Limit demo zosta³ wykorzystany</h3><p>Utwórz konto, odbierz startowe tokeny i testuj endpointy bez ograniczenia demo.</p></div>
-        <a class="button button-primary" href="/register">Zarejestruj siê</a>
+        <div><h3>Limit demo zostaÅ‚ wykorzystany</h3><p>UtwÃ³rz konto, odbierz startowe tokeny i testuj endpointy bez ograniczenia demo.</p></div>
+        <a class="button button-primary" href="/register">Zarejestruj siÄ™</a>
       </div>
     </section>
 
     <section class="steps">
-      <div class="section-head"><h2>Jak dzia³a leadbase.network?</h2><p>Od rejestracji do pierwszego zapytania bez rêcznego obrabiania plików CEIDG.</p></div>
+      <div class="section-head"><h2>Jak dziaÅ‚a leadbase.network?</h2><p>Od rejestracji do pierwszego zapytania bez rÄ™cznego obrabiania plikÃ³w CEIDG.</p></div>
       <div class="step-grid">
-        <article><span>1</span><h3>Utwórz konto</h3><p>Dostajesz pulê darmowych tokenów na start.</p></article>
-        <article><span>2</span><h3>Pobierz klucz API</h3><p>Klucz wysy³asz w nag³ówku <code>X-Api-Key</code>.</p></article>
-        <article><span>3</span><h3>Wybierz kolumny</h3><p>Im mniej danych zwracasz, tym ni¿szy koszt.</p></article>
-        <article><span>4</span><h3>Monitoruj zu¿ycie</h3><p>Saldo i historia zapytañ s¹ zapisywane w ledgerze.</p></article>
+        <article><span>1</span><h3>UtwÃ³rz konto</h3><p>Dostajesz pulÄ™ darmowych tokenÃ³w na start.</p></article>
+        <article><span>2</span><h3>Pobierz klucz API</h3><p>Klucz wysyÅ‚asz w nagÅ‚Ã³wku <code>X-Api-Key</code>.</p></article>
+        <article><span>3</span><h3>Wybierz kolumny</h3><p>Im mniej danych zwracasz, tym niÅ¼szy koszt.</p></article>
+        <article><span>4</span><h3>Monitoruj zuÅ¼ycie</h3><p>Saldo i historia zapytaÅ„ sÄ… zapisywane w ledgerze.</p></article>
       </div>
     </section>
 
     <section class="pricing" id="cennik">
-      <div class="section-head"><h2>Pakiety tokenów</h2><p>Model docelowy: u¿ytkownik kupuje pulê tokenów i zu¿ywa j¹ na zapytania API.</p></div>
+      <div class="section-head"><h2>Pakiety tokenÃ³w</h2><p>Model docelowy: uÅ¼ytkownik kupuje pulÄ™ tokenÃ³w i zuÅ¼ywa jÄ… na zapytania API.</p></div>
       <div class="price-grid">
-        <article><small>START</small><h3>49 z³</h3><p>500 tokenów</p><ul><li>Wa¿noœæ 30 dni</li><li>Wsparcie email</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
-        <article class="featured"><small>PRO</small><h3>199 z³</h3><p>2 500 tokenów</p><ul><li>Wa¿noœæ 30 dni</li><li>Wsparcie priorytetowe</li></ul><a class="button button-primary" href="/swagger">Wybierz pakiet</a></article>
-        <article><small>BUSINESS</small><h3>499 z³</h3><p>7 500 tokenów</p><ul><li>Wa¿noœæ 30 dni</li><li>Indywidualne limity</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
-        <article><small>ENTERPRISE</small><h3>Indywidualnie</h3><p>Wysoki wolumen</p><ul><li>SLA</li><li>Dedykowane warunki</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj siê</a></article>
+        <article><small>START</small><h3>49 zÅ‚</h3><p>500 tokenÃ³w</p><ul><li>WaÅ¼noÅ›Ä‡ 30 dni</li><li>Wsparcie email</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
+        <article class="featured"><small>PRO</small><h3>199 zÅ‚</h3><p>2 500 tokenÃ³w</p><ul><li>WaÅ¼noÅ›Ä‡ 30 dni</li><li>Wsparcie priorytetowe</li></ul><a class="button button-primary" href="/swagger">Wybierz pakiet</a></article>
+        <article><small>BUSINESS</small><h3>499 zÅ‚</h3><p>7 500 tokenÃ³w</p><ul><li>WaÅ¼noÅ›Ä‡ 30 dni</li><li>Indywidualne limity</li></ul><a class="button button-ghost" href="/swagger">Wybierz pakiet</a></article>
+        <article><small>ENTERPRISE</small><h3>Indywidualnie</h3><p>Wysoki wolumen</p><ul><li>SLA</li><li>Dedykowane warunki</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj siÄ™</a></article>
       </div>
     </section>
 
     <section class="docs-band">
-      <div><h2>Dokumentacja dla developerów</h2><p>Swagger UI, przyk³ady zapytañ i lista dostêpnych kolumn s¹ dostêpne od razu w aplikacji.</p></div>
-      <a class="button button-primary" href="/swagger">PrzejdŸ do dokumentacji</a>
+      <div><h2>Dokumentacja dla developerÃ³w</h2><p>Swagger UI, przykÅ‚ady zapytaÅ„ i lista dostÄ™pnych kolumn sÄ… dostÄ™pne od razu w aplikacji.</p></div>
+      <a class="button button-primary" href="/swagger">PrzejdÅº do dokumentacji</a>
     </section>
 
     <section class="dashboard" id="dashboard">
-      <div class="section-head"><h2>Panel u¿ytkownika</h2><p>Kolejny etap produktu: zakup tokenów, historia u¿ycia, klucze API, faktury i limity.</p></div>
+      <div class="section-head"><h2>Panel uÅ¼ytkownika</h2><p>Kolejny etap produktu: zakup tokenÃ³w, historia uÅ¼ycia, klucze API, faktury i limity.</p></div>
       <div class="dashboard-frame">
-        <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Tokeny i p³atnoœci</a><a>Historia u¿ycia</a><a>Klucze API</a><a>Faktury</a></aside>
+        <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Tokeny i pÅ‚atnoÅ›ci</a><a>Historia uÅ¼ycia</a><a>Klucze API</a><a>Faktury</a></aside>
         <div class="dash-main">
-          <div class="metrics"><article><span>Dostêpne tokeny</span><b>12 450</b></article><article><span>Zu¿ycie miesi¹c</span><b>7 550</b></article><article><span>Zapytania</span><b>3 842</b></article><article><span>B³êdy</span><b>0.25%</b></article></div>
+          <div class="metrics"><article><span>DostÄ™pne tokeny</span><b>12 450</b></article><article><span>ZuÅ¼ycie miesiÄ…c</span><b>7 550</b></article><article><span>Zapytania</span><b>3 842</b></article><article><span>BÅ‚Ä™dy</span><b>0.25%</b></article></div>
           <div class="chart"><i style="height:35%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:85%"></i><i style="height:42%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:55%"></i><i style="height:78%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:88%"></i></div>
         </div>
       </div>
