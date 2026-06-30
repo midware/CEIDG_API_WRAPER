@@ -1,7 +1,12 @@
+using System.Collections.Concurrent;
+
 namespace CeidgMirror.Api;
 
 public static class LeadbaseSiteEndpoints
 {
+    private const int AnonymousDemoLimit = 2;
+    private static readonly ConcurrentDictionary<string, int> AnonymousDemoUsage = new(StringComparer.Ordinal);
+
     public static WebApplication MapLeadbaseSite(this WebApplication app)
     {
         app.MapGet("/", () => Results.Content(HomeHtml, "text/html; charset=utf-8"))
@@ -13,9 +18,93 @@ public static class LeadbaseSiteEndpoints
         app.MapGet("/app", () => Results.Content(HomeHtml.Replace("<body>", "<body data-scroll-target=\"dashboard\">"), "text/html; charset=utf-8"))
             .ExcludeFromDescription();
 
+        app.MapGet("/demo/companies", (HttpContext context, string? name, string? city, string? mainPkdCode, string? columns) =>
+        {
+            var key = GetAnonymousDemoKey(context);
+            var used = AnonymousDemoUsage.AddOrUpdate(key, 1, (_, current) => current + 1);
+            if (used > AnonymousDemoLimit)
+            {
+                return Results.Json(new { error = "Demo limit reached.", registrationRequired = true, limit = AnonymousDemoLimit }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var selectedColumns = ResolveDemoColumns(columns);
+            var rows = DemoCompanies.Where(company =>
+                Matches(company.Name, name) &&
+                Matches(company.City, city) &&
+                Matches(company.Pkd, mainPkdCode)).Take(10).ToArray();
+
+            return Results.Ok(new
+            {
+                page = 1,
+                pageSize = rows.Length,
+                totalRows = rows.Length,
+                returnedRows = rows.Length,
+                columns = selectedColumns,
+                tokenCost = Math.Max(1, rows.Length * selectedColumns.Length),
+                demoUsesRemaining = Math.Max(0, AnonymousDemoLimit - used),
+                items = rows.Select(row => ProjectDemoRow(row, selectedColumns))
+            });
+        })
+        .ExcludeFromDescription();
+
         return app;
     }
+    private static string GetAnonymousDemoKey(HttpContext context)
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var agent = context.Request.Headers.UserAgent.ToString();
+        return string.Concat(ip, "|", agent).ToUpperInvariant();
+    }
 
+    private static bool Matches(string value, string? query) =>
+        string.IsNullOrWhiteSpace(query) || value.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static string[] ResolveDemoColumns(string? columns)
+    {
+        var allowed = new[] { "nip", "name", "city", "email", "www", "pkd", "status" };
+        if (string.IsNullOrWhiteSpace(columns))
+        {
+            return allowed;
+        }
+
+        var requested = columns.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(column => allowed.Contains(column, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return requested.Length == 0 ? allowed : requested;
+    }
+
+    private static Dictionary<string, object?> ProjectDemoRow(DemoCompany row, string[] columns)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var column in columns)
+        {
+            result[column] = column.ToLowerInvariant() switch
+            {
+                "nip" => row.Nip,
+                "name" => row.Name,
+                "city" => row.City,
+                "email" => row.Email,
+                "www" => row.Www,
+                "pkd" => row.Pkd,
+                "status" => row.Status,
+                _ => null
+            };
+        }
+
+        return result;
+    }
+
+    private static readonly DemoCompany[] DemoCompanies =
+    [
+        new("7312045678", "FIRMA ABC JAN KOWALSKI", "Warszawa", "biuro@firmaabc.pl", "firmaabc.pl", "62.01.Z", "Aktywny"),
+        new("9491832736", "PV SOLUTIONS SPOLKA Z O.O.", "Krakow", "kontakt@pvsolutions.pl", "pvsolutions.pl", "43.21.Z", "Aktywny"),
+        new("8762459076", "SUN ENERGY S.C.", "Gdansk", "biuro@sunenergy.pl", "sunenergy.pl", "43.21.Z", "Aktywny"),
+        new("5223001189", "EKO INSTALACJE DARIUSZ NOWAK", "Poznan", "d.nowak@ekoinstalacje.pl", "ekoinstalacje.pl", "43.21.Z", "Zawieszony"),
+        new("1132894410", "SOFTWARE LAB ANNA WISNIEWSKA", "Warszawa", "hello@softwarelab.pl", "softwarelab.pl", "62.02.Z", "Aktywny")
+    ];
+
+    private sealed record DemoCompany(string Nip, string Name, string City, string Email, string Www, string Pkd, string Status);
     private const string HomeHtml = """
 <!doctype html>
 <html lang="pl">
@@ -93,21 +182,39 @@ public static class LeadbaseSiteEndpoints
       </div>
     </section>
 
-    <section class="search-preview" aria-label="Podgl¹d wyszukiwarki firm">
+    <section class="endpoint-lab" id="tester" aria-label="Graficzny tester endpointu firm">
       <div class="section-head compact">
-        <h2>Podgl¹d wyników wyszukiwania</h2>
-        <a class="button button-ghost" href="/swagger/index.html#/Companies/get_companies">Testuj endpoint</a>
+        <div><h2>Testuj endpoint firm</h2><p>Wykonaj 2 darmowe zapytania demo. Potem wymagamy rejestracji i klucza API.</p></div>
+        <a class="button button-ghost" href="/swagger/index.html#/Companies/get_companies">Swagger</a>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>NIP</th><th>Nazwa</th><th>Email</th><th>WWW</th><th>PKD</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>7312045678</td><td>FIRMA ABC JAN KOWALSKI</td><td>biuro@firmaabc.pl</td><td>firmaabc.pl</td><td>62.01.Z</td><td><span class="status ok">Aktywny</span></td></tr>
-            <tr><td>9491832736</td><td>PV SOLUTIONS SPÓ£KA Z O.O.</td><td>kontakt@pvsolutions.pl</td><td>pvsolutions.pl</td><td>43.21.Z</td><td><span class="status ok">Aktywny</span></td></tr>
-            <tr><td>8762459076</td><td>SUN ENERGY S.C.</td><td>biuro@sunenergy.pl</td><td>sunenergy.pl</td><td>43.21.Z</td><td><span class="status ok">Aktywny</span></td></tr>
-            <tr><td>5223001189</td><td>EKO INSTALACJE DARIUSZ NOWAK</td><td>d.nowak@ekoinstalacje.pl</td><td>ekoinstalacje.pl</td><td>43.21.Z</td><td><span class="status warn">Zawieszony</span></td></tr>
-          </tbody>
-        </table>
+      <div class="lab-grid">
+        <form class="endpoint-form" id="endpoint-form">
+          <label>Nazwa firmy<input name="name" placeholder="np. energia, instalacje, software"></label>
+          <label>Miasto<input name="city" placeholder="np. Warszawa"></label>
+          <label>PKD<input name="mainPkdCode" placeholder="np. 43.21.Z"></label>
+          <label>API key dla konta<input name="apiKey" placeholder="Opcjonalnie: ceidg_..."></label>
+          <fieldset>
+            <legend>Zwracane kolumny</legend>
+            <label><input type="checkbox" name="columns" value="nip" checked> NIP</label>
+            <label><input type="checkbox" name="columns" value="name" checked> Nazwa</label>
+            <label><input type="checkbox" name="columns" value="city" checked> Miasto</label>
+            <label><input type="checkbox" name="columns" value="email" checked> Email</label>
+            <label><input type="checkbox" name="columns" value="www" checked> WWW</label>
+            <label><input type="checkbox" name="columns" value="pkd" checked> PKD</label>
+            <label><input type="checkbox" name="columns" value="status" checked> Status</label>
+          </fieldset>
+          <button class="button button-primary button-large" type="submit">Testuj endpoint</button>
+          <p class="lab-note" id="demo-counter">Demo: 2 darmowe zapytania bez konta.</p>
+        </form>
+        <div class="endpoint-result">
+          <div class="result-toolbar"><span id="result-status">Gotowy do testu</span><code id="result-url">GET /demo/companies</code></div>
+          <div class="table-wrap"><table id="endpoint-table"><thead></thead><tbody></tbody></table></div>
+          <pre id="result-json">Wynik zapytania pojawi siê tutaj.</pre>
+        </div>
+      </div>
+      <div class="register-gate" id="register-gate" hidden>
+        <div><h3>Limit demo zosta³ wykorzystany</h3><p>Utwórz konto, odbierz startowe tokeny i testuj endpointy bez ograniczenia demo.</p></div>
+        <a class="button button-primary" href="/swagger/index.html#/Authentication/post_auth_register">Zarejestruj siê</a>
       </div>
     </section>
 
@@ -149,6 +256,7 @@ public static class LeadbaseSiteEndpoints
   </main>
 
   <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/swagger">Swagger</a></footer>
+  <script src="/leadbase.js"></script>
 </body>
 </html>
 """;

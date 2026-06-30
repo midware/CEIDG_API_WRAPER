@@ -107,6 +107,8 @@ Invoke-RestMethod -Headers $headers "http://localhost:5075/companies?page=1&page
 
 Token cost depends on selected column weights and returned row count. Insufficient balance returns HTTP `402 Payment Required`.
 
+The product website includes a graphical endpoint tester. Anonymous visitors can run 2 demo calls. After that, the UI requires registration or an API key.
+
 ## Docker On Server
 
 Set secrets in the shell or in an untracked `.env` file. Do not commit real tokens. The worker will start without `CEIDG_JWT_TOKEN`, but CEIDG requests will return `401`; check the startup log for `HasJwtToken=True`.

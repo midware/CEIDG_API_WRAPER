@@ -39,8 +39,8 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = "swagger";
 });
 app.MapOpenApi();
-app.MapProductApi();
 app.MapLeadbaseSite();
+app.MapProductApi();
 
 app.MapGet("/health", () => Results.Ok(new
 {
