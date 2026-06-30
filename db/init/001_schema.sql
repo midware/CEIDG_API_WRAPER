@@ -203,6 +203,7 @@ create index if not exists ix_api_keys_active_hash on app.api_keys(key_hash) whe
 create table if not exists app.token_ledger (
     id bigserial primary key,
     user_id uuid not null references app.api_users(id) on delete cascade,
+    api_key_id uuid null references app.api_keys(id) on delete set null,
     delta bigint not null,
     balance_after bigint not null,
     reason text not null,
@@ -212,10 +213,12 @@ create table if not exists app.token_ledger (
 );
 
 create index if not exists ix_token_ledger_user_created on app.token_ledger(user_id, created_at_utc desc);
+create index if not exists ix_token_ledger_api_key_created on app.token_ledger(api_key_id, created_at_utc desc);
 
 create table if not exists app.api_query_log (
     id uuid primary key,
     user_id uuid not null references app.api_users(id) on delete cascade,
+    api_key_id uuid null references app.api_keys(id) on delete set null,
     endpoint text not null,
     selected_columns text[] not null,
     page integer not null,
@@ -226,4 +229,5 @@ create table if not exists app.api_query_log (
 );
 
 create index if not exists ix_api_query_log_user_created on app.api_query_log(user_id, created_at_utc desc);
+create index if not exists ix_api_query_log_api_key_created on app.api_query_log(api_key_id, created_at_utc desc);
 

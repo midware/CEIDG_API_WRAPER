@@ -961,6 +961,23 @@ ul { padding-left: 18px; }
   border-bottom: 0;
 }
 
+.ledger-key {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ledger-key strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ledger-key code {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .panel-table code,
 .api-key-created code {
   display: inline-block;

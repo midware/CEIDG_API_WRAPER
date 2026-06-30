@@ -30,7 +30,7 @@ public sealed record CompanySearchResponse(
     long TokenBalanceAfter,
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Items);
 
-public sealed record ApiUserContext(Guid UserId, string Email, long TokenBalance);
+public sealed record ApiUserContext(Guid UserId, Guid ApiKeyId, string Email, long TokenBalance);
 public sealed record AccountPanel(
     Guid UserId,
     string Email,
@@ -42,7 +42,7 @@ public sealed record AccountPanel(
     IReadOnlyList<AccountQueryLog> QueryLogs);
 
 public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc, DateTimeOffset? ExpiresAtUtc, DateTimeOffset? RevokedAtUtc);
-public sealed record AccountLedgerEntry(DateTimeOffset CreatedAtUtc, long Delta, long BalanceAfter, string Reason);
+public sealed record AccountLedgerEntry(DateTimeOffset CreatedAtUtc, long Delta, long BalanceAfter, string Reason, string? ApiKeyPrefix, string? ApiKeyName);
 public sealed record AccountQueryLog(DateTimeOffset CreatedAtUtc, string Endpoint, IReadOnlyList<string> SelectedColumns, int ReturnedRows, long TokenCost);
 
 public static class ProductApiEndpoints
@@ -180,7 +180,7 @@ public static class ProductApiEndpoints
             pageSize = Math.Min(pageSize, options.MaxPageSize);
 
             var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, selectedColumns);
-            var result = await store.SearchCompaniesAsync(user.UserId, query, cancellationToken);
+            var result = await store.SearchCompaniesAsync(user.UserId, user.ApiKeyId, query, cancellationToken);
 
             if (!result.Success)
             {
@@ -260,7 +260,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             throw new DuplicateEmailException();
         }
 
-        await InsertLedgerAsync(connection, transaction, userId, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
+        await InsertLedgerAsync(connection, transaction, userId, null, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
         var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (key.ApiKey, key.KeyPrefix, freeTokens);
@@ -321,7 +321,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             throw new DuplicateEmailException();
         }
 
-        await InsertLedgerAsync(connection, transaction, userId, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
+        await InsertLedgerAsync(connection, transaction, userId, null, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
         var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (key.ApiKey, key.KeyPrefix, freeTokens);
@@ -433,10 +433,11 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
 
         var ledger = new List<AccountLedgerEntry>();
         await using (var ledgerCommand = dataSource.CreateCommand("""
-            select created_at_utc, delta, balance_after, reason
-            from app.token_ledger
-            where user_id = $1
-            order by created_at_utc desc
+            select l.created_at_utc, l.delta, l.balance_after, l.reason, k.key_prefix, k.name
+            from app.token_ledger l
+            left join app.api_keys k on k.id = l.api_key_id
+            where l.user_id = $1
+            order by l.created_at_utc desc
             limit 10
             """))
         {
@@ -448,7 +449,9 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
                     ledgerReader.GetFieldValue<DateTimeOffset>(0),
                     ledgerReader.GetInt64(1),
                     ledgerReader.GetInt64(2),
-                    ledgerReader.GetString(3)));
+                    ledgerReader.GetString(3),
+                    await ledgerReader.IsDBNullAsync(4, cancellationToken) ? null : ledgerReader.GetString(4),
+                    await ledgerReader.IsDBNullAsync(5, cancellationToken) ? null : ledgerReader.GetString(5)));
             }
         }
 
@@ -507,8 +510,8 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             return null;
         }
 
-        var user = new ApiUserContext(reader.GetGuid(0), reader.GetString(1), reader.GetInt64(2));
         var keyId = reader.GetGuid(3);
+        var user = new ApiUserContext(reader.GetGuid(0), keyId, reader.GetString(1), reader.GetInt64(2));
         await reader.DisposeAsync();
 
         await using var update = new NpgsqlCommand("update app.api_keys set last_used_at_utc = now() where id = $1", connection, transaction);
@@ -518,7 +521,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         return user;
     }
 
-    public async Task<CompanySearchResult> SearchCompaniesAsync(Guid userId, CompanySearchQuery query, CancellationToken cancellationToken)
+    public async Task<CompanySearchResult> SearchCompaniesAsync(Guid userId, Guid apiKeyId, CompanySearchQuery query, CancellationToken cancellationToken)
     {
         var where = new List<string>();
         var parameters = new List<NpgsqlParameter>();
@@ -577,7 +580,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         }
 
         var tokenCost = TokenPricing.CalculateCost(query.Columns, items.Count);
-        var debit = await TryDebitAsync(userId, tokenCost, "company_search", new
+        var debit = await TryDebitAsync(userId, apiKeyId, tokenCost, "company_search", new
         {
             query.Page,
             query.PageSize,
@@ -591,12 +594,13 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         }
 
         await using (var logCommand = dataSource.CreateCommand("""
-            insert into app.api_query_log (id, user_id, endpoint, selected_columns, page, page_size, returned_rows, token_cost)
-            values ($1, $2, 'GET /companies', $3, $4, $5, $6, $7)
+            insert into app.api_query_log (id, user_id, api_key_id, endpoint, selected_columns, page, page_size, returned_rows, token_cost)
+            values ($1, $2, $3, 'GET /companies', $4, $5, $6, $7, $8)
             """))
         {
             logCommand.Parameters.AddWithValue(Guid.NewGuid());
             logCommand.Parameters.AddWithValue(userId);
+            logCommand.Parameters.AddWithValue(apiKeyId);
             logCommand.Parameters.AddWithValue(query.Columns.Select(c => c.ApiName).ToArray());
             logCommand.Parameters.AddWithValue(query.Page);
             logCommand.Parameters.AddWithValue(query.PageSize);
@@ -608,7 +612,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         return CompanySearchResult.Ok(items, totalRows, tokenCost, debit.BalanceAfter);
     }
 
-    private async Task<(bool Success, long BalanceAfter)> TryDebitAsync(Guid userId, long tokenCost, string reason, object metadata, CancellationToken cancellationToken)
+    private async Task<(bool Success, long BalanceAfter)> TryDebitAsync(Guid userId, Guid? apiKeyId, long tokenCost, string reason, object metadata, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -640,7 +644,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             await update.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await InsertLedgerAsync(connection, transaction, userId, -tokenCost, balanceAfter, reason, Guid.NewGuid(), metadata, cancellationToken);
+        await InsertLedgerAsync(connection, transaction, userId, apiKeyId, -tokenCost, balanceAfter, reason, Guid.NewGuid(), metadata, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (true, balanceAfter);
     }
@@ -649,6 +653,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         Guid userId,
+        Guid? apiKeyId,
         long delta,
         long balanceAfter,
         string reason,
@@ -657,10 +662,11 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         CancellationToken cancellationToken)
     {
         await using var ledger = new NpgsqlCommand("""
-            insert into app.token_ledger (user_id, delta, balance_after, reason, request_id, metadata)
-            values ($1, $2, $3, $4, $5, $6::jsonb)
+            insert into app.token_ledger (user_id, api_key_id, delta, balance_after, reason, request_id, metadata)
+            values ($1, $2, $3, $4, $5, $6, $7::jsonb)
             """, connection, transaction);
         ledger.Parameters.AddWithValue(userId);
+        ledger.Parameters.AddWithValue((object?)apiKeyId ?? DBNull.Value);
         ledger.Parameters.AddWithValue(delta);
         ledger.Parameters.AddWithValue(balanceAfter);
         ledger.Parameters.AddWithValue(reason);

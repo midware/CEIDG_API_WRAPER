@@ -263,9 +263,9 @@ public static class LeadbaseSiteEndpoints
         }
 
         return """
-          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Data</th><th>Powód</th><th>Zmiana</th><th>Saldo po</th></tr></thead><tbody>
+          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Data</th><th>Klucz API</th><th>Powód</th><th>Zmiana</th><th>Saldo po</th></tr></thead><tbody>
 """ + string.Join(string.Empty, ledger.Select(entry => $"""
-            <tr><td>{FormatDate(entry.CreatedAtUtc)}</td><td>{Html(ReasonLabel(entry.Reason))}</td><td class="{(entry.Delta < 0 ? "negative" : "positive")}">{entry.Delta:+#,0;-#,0;0}</td><td>{entry.BalanceAfter:N0}</td></tr>
+            <tr><td>{FormatDate(entry.CreatedAtUtc)}</td><td>{RenderLedgerApiKey(entry)}</td><td>{Html(ReasonLabel(entry.Reason))}</td><td class="{(entry.Delta < 0 ? "negative" : "positive")}">{entry.Delta:+#,0;-#,0;0}</td><td>{entry.BalanceAfter:N0}</td></tr>
 """)) + """
           </tbody></table></div>
 """;
@@ -285,6 +285,17 @@ public static class LeadbaseSiteEndpoints
 """)) + """
           </tbody></table></div>
 """;
+    }
+
+    private static string RenderLedgerApiKey(AccountLedgerEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.ApiKeyPrefix))
+        {
+            return "<span class=\"muted-cell\">-</span>";
+        }
+
+        var name = string.IsNullOrWhiteSpace(entry.ApiKeyName) ? "Klucz API" : entry.ApiKeyName;
+        return $"<span class=\"ledger-key\"><strong>{Html(name)}</strong><code>{Html(entry.ApiKeyPrefix)}</code></span>";
     }
 
     private static string FormatDate(DateTimeOffset? value) => value is null ? "-" : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
