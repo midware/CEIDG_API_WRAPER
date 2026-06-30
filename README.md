@@ -95,6 +95,9 @@ Core endpoints:
 - `GET /billing/token-packages` - lists token packages for future payment integration.
 - `GET /` - leadbase.network product website.
 - `GET /docs` - redirects to Swagger documentation.
+- `GET /register`, `POST /register` - web account registration with email confirmation.
+- `GET /confirm-email` - confirms a registered email address.
+- `GET /login`, `POST /login`, `GET /logout` - web login/logout with cookie session.
 - `GET /companies/columns` - lists selectable columns and token weights.
 - `GET /companies` - paginated company search with dynamic columns; requires `X-Api-Key`.
 
@@ -118,6 +121,10 @@ Example `.env` on the server:
 ```env
 CEIDG_JWT_TOKEN=YOUR_CEIDG_TOKEN
 POSTGRES_CONNECTION_STRING=Host=postgres;Port=5432;Database=ceidg_mirror;Username=ceidg;Password=ceidg_dev_password
+LeadbaseEmail__PublicBaseUrl=https://leadbase.network
+LeadbaseEmail__SmtpHost=smtp.example.com
+LeadbaseEmail__SmtpUser=YOUR_SMTP_USER
+LeadbaseEmail__SmtpPassword=YOUR_SMTP_PASSWORD
 ```
 
 Start PostgreSQL only:

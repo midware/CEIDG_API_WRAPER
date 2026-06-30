@@ -143,7 +143,7 @@ public static class LeadbaseSiteEndpoints
     </nav>
     <div class="header-actions">
       <a class="button button-ghost" href="/swagger">Swagger</a>
-      <a class="button button-primary" href="/swagger/index.html#/Authentication/post_auth_register">Utwórz konto</a>
+      <a class="button button-primary" href="/register">Utwórz konto</a>
     </div>
   </header>
 
@@ -153,7 +153,7 @@ public static class LeadbaseSiteEndpoints
         <h1>Dane firm z CEIDG przez API rozliczane tokenami</h1>
         <p>Wyszukuj firmy, wybieraj dok³adnie te kolumny, których potrzebujesz, korzystaj ze stronicowanego API i p³aæ tylko za realnie pobrane dane.</p>
         <div class="hero-actions">
-          <a class="button button-primary button-large" href="/swagger/index.html#/Authentication/post_auth_register">Utwórz konto</a>
+          <a class="button button-primary button-large" href="/register">Utwórz konto</a>
           <a class="button button-secondary button-large" href="/swagger">Zobacz Swagger</a>
         </div>
         <div class="proof-grid" aria-label="Najwa¿niejsze funkcje">
@@ -234,7 +234,7 @@ public static class LeadbaseSiteEndpoints
       </div>
       <div class="register-gate" id="register-gate" hidden>
         <div><h3>Limit demo zosta³ wykorzystany</h3><p>Utwórz konto, odbierz startowe tokeny i testuj endpointy bez ograniczenia demo.</p></div>
-        <a class="button button-primary" href="/swagger/index.html#/Authentication/post_auth_register">Zarejestruj siê</a>
+        <a class="button button-primary" href="/register">Zarejestruj siê</a>
       </div>
     </section>
 

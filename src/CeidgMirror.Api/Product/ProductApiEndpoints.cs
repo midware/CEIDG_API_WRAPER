@@ -95,6 +95,11 @@ public static class ProductApiEndpoints
                 return Results.Unauthorized();
             }
 
+            if (!user.EmailConfirmed)
+            {
+                return Results.Json(new { error = "Email address is not confirmed." }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             var apiKey = await store.CreateApiKeyAsync(user.UserId, request.KeyName ?? "login", cancellationToken);
             return Results.Ok(new ApiKeyResponse(apiKey.ApiKey, apiKey.KeyPrefix, user.TokenBalance));
         })
@@ -223,8 +228,8 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         try
         {
             await using (var command = new NpgsqlCommand("""
-                insert into app.api_users (id, email, email_normalized, password_hash, display_name, token_balance)
-                values ($1, $2, $3, $4, $5, $6)
+                insert into app.api_users (id, email, email_normalized, password_hash, display_name, token_balance, email_confirmed_at_utc)
+                values ($1, $2, $3, $4, $5, $6, now())
                 """, connection, transaction))
             {
                 command.Parameters.AddWithValue(userId);
@@ -250,7 +255,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
     public async Task<LoginUser?> GetUserForLoginAsync(string normalizedEmail, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""
-            select id, password_hash, token_balance
+            select id, password_hash, token_balance, email_confirmed_at_utc is not null
             from app.api_users
             where email_normalized = $1 and disabled_at_utc is null
             """);
@@ -262,9 +267,78 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             return null;
         }
 
-        return new LoginUser(reader.GetGuid(0), reader.GetString(1), reader.GetInt64(2));
+        return new LoginUser(reader.GetGuid(0), reader.GetString(1), reader.GetInt64(2), reader.GetBoolean(3));
     }
 
+    public async Task<(string ApiKey, string KeyPrefix, long TokenBalance)> RegisterUserAsync(
+        string normalizedEmail,
+        string email,
+        string? displayName,
+        string passwordHash,
+        long freeTokens,
+        string confirmationTokenHash,
+        DateTimeOffset confirmationExpiresAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var userId = Guid.NewGuid();
+        try
+        {
+            await using (var command = new NpgsqlCommand("""
+                insert into app.api_users (id, email, email_normalized, password_hash, display_name, token_balance, email_confirmation_token_hash, email_confirmation_expires_at_utc)
+                values ($1, $2, $3, $4, $5, $6, $7, $8)
+                """, connection, transaction))
+            {
+                command.Parameters.AddWithValue(userId);
+                command.Parameters.AddWithValue(email);
+                command.Parameters.AddWithValue(normalizedEmail);
+                command.Parameters.AddWithValue(passwordHash);
+                command.Parameters.AddWithValue((object?)displayName ?? DBNull.Value);
+                command.Parameters.AddWithValue(freeTokens);
+                command.Parameters.AddWithValue(confirmationTokenHash);
+                command.Parameters.AddWithValue(confirmationExpiresAtUtc);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new DuplicateEmailException();
+        }
+
+        await InsertLedgerAsync(connection, transaction, userId, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
+        var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return (key.ApiKey, key.KeyPrefix, freeTokens);
+    }
+
+    public async Task<bool> ConfirmEmailAsync(string confirmationTokenHash, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            update app.api_users
+            set email_confirmed_at_utc = now(),
+                email_confirmation_token_hash = null,
+                email_confirmation_expires_at_utc = null,
+                updated_at_utc = now()
+            where email_confirmation_token_hash = $1
+              and email_confirmation_expires_at_utc > now()
+              and email_confirmed_at_utc is null
+            """);
+        command.Parameters.AddWithValue(confirmationTokenHash);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    public async Task MarkLoginAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            update app.api_users
+            set last_login_at_utc = now(), updated_at_utc = now()
+            where id = $1
+            """);
+        command.Parameters.AddWithValue(userId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
     public async Task<(string ApiKey, string KeyPrefix)> CreateApiKeyAsync(Guid userId, string keyName, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -286,6 +360,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             where k.key_hash = $1
               and k.revoked_at_utc is null
               and u.disabled_at_utc is null
+              and u.email_confirmed_at_utc is not null
             """, connection, transaction);
         command.Parameters.AddWithValue(keyHash);
 
@@ -494,7 +569,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
     private static NpgsqlParameter CloneParameter(NpgsqlParameter parameter) => new(parameter.ParameterName, parameter.Value);
 }
 
-public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance);
+public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance, bool EmailConfirmed);
 public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, IReadOnlyList<CompanyColumn> Columns);
 
 public sealed record CompanySearchResult(bool Success, IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, long TotalRows, long TokenCost, long TokenBalanceAfter)
@@ -609,3 +684,4 @@ public static class PasswordSecurity
 }
 
 public sealed class DuplicateEmailException : Exception;
+

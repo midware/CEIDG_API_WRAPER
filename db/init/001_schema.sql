@@ -193,6 +193,9 @@ create table if not exists app.api_keys (
     revoked_at_utc timestamptz null
 );
 
+create index if not exists ix_api_users_email_confirmation_token on app.api_users(email_confirmation_token_hash) where email_confirmation_token_hash is not null;
+create index if not exists ix_api_users_password_reset_token on app.api_users(password_reset_token_hash) where password_reset_token_hash is not null;
+
 create index if not exists ix_api_keys_user_id on app.api_keys(user_id);
 create index if not exists ix_api_keys_active_hash on app.api_keys(key_hash) where revoked_at_utc is null;
 
@@ -222,3 +225,4 @@ create table if not exists app.api_query_log (
 );
 
 create index if not exists ix_api_query_log_user_created on app.api_query_log(user_id, created_at_utc desc);
+

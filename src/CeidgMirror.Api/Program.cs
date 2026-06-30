@@ -8,6 +8,19 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.AccessDeniedPath = "/login";
+        options.Cookie.Name = "leadbase.session";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.SlidingExpiration = true;
+    });
+builder.Services.AddAuthorization();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -27,10 +40,13 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddCeidgClient(builder.Configuration);
 builder.Services.AddProductApi(builder.Configuration);
+builder.Services.AddLeadbaseAccountEmail(builder.Configuration);
 
 var app = builder.Build();
 
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseSwagger();
 app.UseSwaggerUI(options =>
@@ -40,6 +56,7 @@ app.UseSwaggerUI(options =>
 });
 app.MapOpenApi();
 app.MapLeadbaseSite();
+app.MapLeadbaseAccount();
 app.MapProductApi();
 
 app.MapGet("/health", () => Results.Ok(new

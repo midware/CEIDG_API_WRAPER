@@ -415,3 +415,81 @@ ul { padding-left: 18px; }
   .result-toolbar { grid-template-columns: 1fr; padding: 12px 14px; }
   .register-gate { align-items: flex-start; flex-direction: column; }
 }
+
+.account-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f7f9fb 0%, #edf4f5 100%);
+}
+
+.account-shell {
+  width: min(520px, calc(100% - 32px));
+  margin: 0 auto;
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+  padding: 48px 0;
+}
+
+.account-form {
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.account-form h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.account-form p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.account-form label {
+  display: grid;
+  gap: 7px;
+  color: #405159;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.account-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cfdbe0;
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.account-form input:focus {
+  outline: 3px solid rgba(8, 127, 122, .18);
+  border-color: var(--teal);
+}
+
+.account-form > a:not(.button), .dev-link a {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.form-error {
+  padding: 12px 14px;
+  background: #fff2d9;
+  border: 1px solid #f1d19a;
+  border-radius: 8px;
+  color: #7a5a21;
+  font-size: 14px;
+  font-weight: 700;
+}
