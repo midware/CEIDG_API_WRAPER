@@ -807,7 +807,7 @@ ul { padding-left: 18px; }
 
 .key-create-form {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(210px, .9fr) auto;
   gap: 12px;
   align-items: end;
   padding: 14px;
@@ -834,6 +834,94 @@ ul { padding-left: 18px; }
   font: inherit;
   font-size: 14px;
   font-weight: 500;
+}
+
+.key-create-form label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.api-key-list {
+  display: grid;
+  gap: 12px;
+}
+
+.api-key-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(360px, 2fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.api-key-card-inactive {
+  background: #f4f7f8;
+  color: #7b8b92;
+}
+
+.api-key-card-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.api-key-card-main strong {
+  overflow-wrap: anywhere;
+}
+
+.api-key-card-main code {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.api-key-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.api-key-meta div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.api-key-meta dt {
+  color: #66777e;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.api-key-meta dd {
+  margin: 0;
+  color: #263940;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.api-key-meta small {
+  display: block;
+  margin-top: 4px;
+  color: #87969c;
+  font-weight: 700;
+}
+
+.api-key-actions {
+  justify-self: end;
+}
+
+.api-key-card-inactive .api-key-meta dd,
+.api-key-card-inactive code {
+  color: #7b8b92;
 }
 
 .panel-table-wrap {
@@ -961,8 +1049,15 @@ ul { padding-left: 18px; }
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1040px) {
   .key-create-form { grid-template-columns: 1fr; }
+  .api-key-card { grid-template-columns: 1fr; align-items: start; }
+  .api-key-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .api-key-actions { justify-self: start; }
+}
+
+@media (max-width: 720px) {
+  .api-key-meta { grid-template-columns: 1fr; }
   .panel-section { padding: 18px; }
   .panel-section-head { flex-direction: column; }
   .legal-grid { grid-template-columns: 1fr; }

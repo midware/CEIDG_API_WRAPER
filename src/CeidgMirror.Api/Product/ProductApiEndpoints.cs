@@ -41,7 +41,7 @@ public sealed record AccountPanel(
     IReadOnlyList<AccountLedgerEntry> Ledger,
     IReadOnlyList<AccountQueryLog> QueryLogs);
 
-public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc, DateTimeOffset? RevokedAtUtc);
+public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc, DateTimeOffset? ExpiresAtUtc, DateTimeOffset? RevokedAtUtc);
 public sealed record AccountLedgerEntry(DateTimeOffset CreatedAtUtc, long Delta, long BalanceAfter, string Reason);
 public sealed record AccountQueryLog(DateTimeOffset CreatedAtUtc, string Endpoint, IReadOnlyList<string> SelectedColumns, int ReturnedRows, long TokenCost);
 
@@ -113,7 +113,7 @@ public static class ProductApiEndpoints
                 return Results.Json(new { error = "Email address is not confirmed." }, statusCode: StatusCodes.Status403Forbidden);
             }
 
-            var apiKey = await store.CreateApiKeyAsync(user.UserId, request.KeyName ?? "login", cancellationToken);
+            var apiKey = await store.CreateApiKeyAsync(user.UserId, request.KeyName ?? "login", null, cancellationToken);
             return Results.Ok(new ApiKeyResponse(apiKey.ApiKey, apiKey.KeyPrefix, user.TokenBalance));
         })
         .WithSummary("Login and issue a new API key");
@@ -261,7 +261,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         }
 
         await InsertLedgerAsync(connection, transaction, userId, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
-        var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", cancellationToken);
+        var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (key.ApiKey, key.KeyPrefix, freeTokens);
     }
@@ -322,7 +322,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         }
 
         await InsertLedgerAsync(connection, transaction, userId, freeTokens, freeTokens, "registration_bonus", null, new { freeTokens }, cancellationToken);
-        var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", cancellationToken);
+        var key = await InsertApiKeyAsync(connection, transaction, userId, "registration", null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (key.ApiKey, key.KeyPrefix, freeTokens);
     }
@@ -353,11 +353,11 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         command.Parameters.AddWithValue(userId);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
-    public async Task<(string ApiKey, string KeyPrefix)> CreateApiKeyAsync(Guid userId, string keyName, CancellationToken cancellationToken)
+    public async Task<(string ApiKey, string KeyPrefix)> CreateApiKeyAsync(Guid userId, string keyName, DateTimeOffset? expiresAtUtc, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        var key = await InsertApiKeyAsync(connection, transaction, userId, keyName, cancellationToken);
+        var key = await InsertApiKeyAsync(connection, transaction, userId, keyName, expiresAtUtc, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return key;
     }
@@ -382,7 +382,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             select u.id,
                    u.email,
                    u.token_balance,
-                   (select count(*)::int from app.api_keys k where k.user_id = u.id and k.revoked_at_utc is null) as api_key_count,
+                   (select count(*)::int from app.api_keys k where k.user_id = u.id and k.revoked_at_utc is null and (k.expires_at_utc is null or k.expires_at_utc > now())) as api_key_count,
                    (select count(*)::bigint from app.api_query_log q where q.user_id = u.id) as query_count
             from app.api_users u
             where u.id = $1
@@ -409,7 +409,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
 
         var apiKeys = new List<AccountApiKey>();
         await using (var keysCommand = dataSource.CreateCommand("""
-            select id, key_prefix, name, created_at_utc, last_used_at_utc, revoked_at_utc
+            select id, key_prefix, name, created_at_utc, last_used_at_utc, expires_at_utc, revoked_at_utc
             from app.api_keys
             where user_id = $1
             order by created_at_utc desc
@@ -426,7 +426,8 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
                     await keysReader.IsDBNullAsync(2, cancellationToken) ? null : keysReader.GetString(2),
                     keysReader.GetFieldValue<DateTimeOffset>(3),
                     await keysReader.IsDBNullAsync(4, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(4),
-                    await keysReader.IsDBNullAsync(5, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(5)));
+                    await keysReader.IsDBNullAsync(5, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(5),
+                    await keysReader.IsDBNullAsync(6, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(6)));
             }
         }
 
@@ -494,6 +495,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             join app.api_users u on u.id = k.user_id
             where k.key_hash = $1
               and k.revoked_at_utc is null
+              and (k.expires_at_utc is null or k.expires_at_utc > now())
               and u.disabled_at_utc is null
               and u.email_confirmed_at_utc is not null
             """, connection, transaction);
@@ -672,19 +674,21 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         NpgsqlTransaction transaction,
         Guid userId,
         string keyName,
+        DateTimeOffset? expiresAtUtc,
         CancellationToken cancellationToken)
     {
         var apiKey = ApiKeySecurity.GenerateApiKey();
         var prefix = ApiKeySecurity.GetPrefix(apiKey);
         await using var command = new NpgsqlCommand("""
-            insert into app.api_keys (id, user_id, key_prefix, key_hash, name)
-            values ($1, $2, $3, $4, $5)
+            insert into app.api_keys (id, user_id, key_prefix, key_hash, name, expires_at_utc)
+            values ($1, $2, $3, $4, $5, $6)
             """, connection, transaction);
         command.Parameters.AddWithValue(Guid.NewGuid());
         command.Parameters.AddWithValue(userId);
         command.Parameters.AddWithValue(prefix);
         command.Parameters.AddWithValue(ApiKeySecurity.HashApiKey(apiKey));
         command.Parameters.AddWithValue(keyName);
+        command.Parameters.AddWithValue((object?)expiresAtUtc ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
         return (apiKey, prefix);
     }

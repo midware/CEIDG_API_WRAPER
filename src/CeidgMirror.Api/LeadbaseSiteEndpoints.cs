@@ -41,7 +41,8 @@ public static class LeadbaseSiteEndpoints
 
             var form = await context.Request.ReadFormAsync(cancellationToken);
             var keyName = form["keyName"].ToString().Trim();
-            var created = await store.CreateApiKeyAsync(userId.Value, string.IsNullOrWhiteSpace(keyName) ? "Panel" : keyName, cancellationToken);
+            var expiresAtUtc = ParseApiKeyExpiration(form["expiresAtLocal"].ToString());
+            var created = await store.CreateApiKeyAsync(userId.Value, string.IsNullOrWhiteSpace(keyName) ? "Panel" : keyName, expiresAtUtc, cancellationToken);
             return Results.Content(RenderCreatedApiKeyHtml(created.ApiKey, created.KeyPrefix), "text/html; charset=utf-8");
         })
         .ExcludeFromDescription();
@@ -148,6 +149,7 @@ public static class LeadbaseSiteEndpoints
           <div class="panel-section-head"><div><h2>Klucze API</h2><p>Pełny klucz pokazujemy tylko raz po utworzeniu. W bazie przechowujemy hash oraz prefiks.</p></div></div>
           <form class="key-create-form" method="post" action="/app/api-keys">
             <label>Nazwa klucza <input name="keyName" maxlength="80" placeholder="np. Integracja CRM" autocomplete="off"></label>
+            <label>Ważny do <input name="expiresAtLocal" type="datetime-local" autocomplete="off"><span>Opcjonalnie. Puste pole oznacza ważność bezterminową.</span></label>
             <button class="button button-primary" type="submit">Utwórz klucz</button>
           </form>
           {RenderApiKeys(account.ApiKeys)}
@@ -211,23 +213,23 @@ public static class LeadbaseSiteEndpoints
     {
         if (apiKeys.Count == 0)
         {
-            return "<div class=\"empty-state\">Nie masz jeszcze aktywnych kluczy API.</div>";
+            return "<div class=\"empty-state\">Nie masz jeszcze kluczy API.</div>";
         }
 
-        return """
-          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Nazwa</th><th>Prefiks</th><th>Status</th><th>Utworzony</th><th>Ostatnie użycie</th><th>Akcje</th></tr></thead><tbody>
-""" + string.Join(string.Empty, apiKeys.Select(RenderApiKeyRow)) + """
-          </tbody></table></div>
-""";
+        return "<div class=\"api-key-list\">" + string.Join(string.Empty, apiKeys.Select(RenderApiKeyCard)) + "</div>";
     }
 
-    private static string RenderApiKeyRow(AccountApiKey key)
+    private static string RenderApiKeyCard(AccountApiKey key)
     {
         var isRevoked = key.RevokedAtUtc is not null;
-        var rowClass = isRevoked ? " class=\"revoked-key\"" : string.Empty;
+        var isExpired = !isRevoked && key.ExpiresAtUtc is not null && key.ExpiresAtUtc <= DateTimeOffset.UtcNow;
+        var cardClass = isRevoked || isExpired ? " api-key-card-inactive" : string.Empty;
         var status = isRevoked
             ? $"<span class=\"status-pill status-revoked\">Unieważniony</span><small>od {FormatDate(key.RevokedAtUtc)}</small>"
-            : "<span class=\"status-pill status-active\">Aktywny</span>";
+            : isExpired
+                ? $"<span class=\"status-pill status-revoked\">Wygasł</span><small>od {FormatDate(key.ExpiresAtUtc)}</small>"
+                : "<span class=\"status-pill status-active\">Aktywny</span>";
+        var validUntil = key.ExpiresAtUtc is null ? "Bezterminowo" : FormatDate(key.ExpiresAtUtc);
         var actions = isRevoked
             ? "<span class=\"muted-cell\">Brak akcji</span>"
             : $"""
@@ -237,7 +239,19 @@ public static class LeadbaseSiteEndpoints
 """;
 
         return $"""
-            <tr{rowClass}><td>{Html(key.Name ?? "Bez nazwy")}</td><td><code>{Html(key.KeyPrefix)}</code></td><td>{status}</td><td>{FormatDate(key.CreatedAtUtc)}</td><td>{FormatDate(key.LastUsedAtUtc)}</td><td>{actions}</td></tr>
+          <article class="api-key-card{cardClass}">
+            <div class="api-key-card-main">
+              <strong>{Html(key.Name ?? "Bez nazwy")}</strong>
+              <code>{Html(key.KeyPrefix)}</code>
+            </div>
+            <dl class="api-key-meta">
+              <div><dt>Status</dt><dd>{status}</dd></div>
+              <div><dt>Ważny do</dt><dd>{Html(validUntil)}</dd></div>
+              <div><dt>Utworzony</dt><dd>{FormatDate(key.CreatedAtUtc)}</dd></div>
+              <div><dt>Ostatnie użycie</dt><dd>{FormatDate(key.LastUsedAtUtc)}</dd></div>
+            </dl>
+            <div class="api-key-actions">{actions}</div>
+          </article>
 """;
     }
 
@@ -280,6 +294,22 @@ public static class LeadbaseSiteEndpoints
         "company_search" => "Zapytanie do firm",
         _ => reason
     };
+
+    private static DateTimeOffset? ParseApiKeyExpiration(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParse(value, out var localDateTime))
+        {
+            return null;
+        }
+
+        var unspecified = DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified);
+        return new DateTimeOffset(unspecified, TimeZoneInfo.Local.GetUtcOffset(unspecified)).ToUniversalTime();
+    }
 
     private static string Html(string? value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
     private static string GetAnonymousDemoKey(HttpContext context)

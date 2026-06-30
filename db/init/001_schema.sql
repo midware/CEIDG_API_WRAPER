@@ -190,6 +190,7 @@ create table if not exists app.api_keys (
     name text null,
     created_at_utc timestamptz not null default now(),
     last_used_at_utc timestamptz null,
+    expires_at_utc timestamptz null,
     revoked_at_utc timestamptz null
 );
 
