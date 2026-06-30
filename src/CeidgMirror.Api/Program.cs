@@ -1,19 +1,45 @@
 using CeidgMirror.Api;
 using CeidgMirror.Infrastructure.Ceidg;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 AddLocalSettings(builder.Configuration, "CeidgMirror.Api");
 builder.Configuration.AddEnvironmentVariables();
 
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "CEIDG Mirror API",
+        Version = "v1",
+        Description = "Authenticated API for querying the local CEIDG PostgreSQL mirror with token-based billing."
+    });
+    options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Description = "Paste your API key. It is sent as the X-Api-Key header.",
+        Name = "X-Api-Key",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
+});
+
 builder.Services.AddCeidgClient(builder.Configuration);
+builder.Services.AddProductApi(builder.Configuration);
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.MapOpenApi();
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "CEIDG Mirror API v1");
+    options.RoutePrefix = "swagger";
+});
+app.MapOpenApi();
+app.MapProductApi();
+
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.MapGet("/health", () => Results.Ok(new
 {

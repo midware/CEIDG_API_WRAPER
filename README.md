@@ -92,6 +92,38 @@ $env:CeidgApi__JwtToken = "YOUR_TOKEN"
 
 Do not commit real tokens. The current default base URL points to the active CEIDG v3 company API.
 
+## Product API
+
+The API host exposes Swagger UI at:
+
+```text
+http://localhost:5075/swagger
+```
+
+Core endpoints:
+
+- `POST /auth/register` - creates a user, grants free starting tokens, and returns the first API key.
+- `POST /auth/login` - verifies email/password and issues a new API key.
+- `GET /account/balance` - returns the current token balance; requires `X-Api-Key`.
+- `GET /billing/token-packages` - lists token packages prepared for paid billing integration.
+- `GET /companies/columns` - lists selectable fields and token weights.
+- `GET /companies` - searches CEIDG company rows with pagination and dynamic columns; requires `X-Api-Key`.
+
+Example company query:
+
+```powershell
+$headers = @{ "X-Api-Key" = "YOUR_API_KEY" }
+Invoke-RestMethod -Headers $headers "http://localhost:5075/companies?page=1&pageSize=25&columns=ceidgId,nip,name,city,email,pkdCodes&city=Warszawa"
+```
+
+Token cost is calculated from the selected column weights and number of returned rows. The request is rejected with HTTP `402 Payment Required` if the user does not have enough tokens.
+
+For an existing local database, rerun the setup script after pulling this version so the `app.*` authentication and billing tables are created:
+
+```powershell
+$env:PGPASSWORD = "postgres"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -f db\setup_local_database.sql
+```
 ## Docker Worker
 
 Build the worker image:
