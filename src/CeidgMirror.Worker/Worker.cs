@@ -1,4 +1,5 @@
 using CeidgMirror.Application.Importing;
+using CeidgMirror.Infrastructure.Ceidg;
 
 namespace CeidgMirror.Worker;
 
@@ -6,12 +7,13 @@ public class Worker(
     ILogger<Worker> logger,
     ICeidgImportService importService,
     ImportOptions importOptions,
+    CeidgApiOptions ceidgApiOptions,
     IHostApplicationLifetime lifetime) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "CEIDG mirror worker started. ImportEnabled={ImportEnabled}, RunOnce={RunOnce}, Source={Source}, StartPage={StartPage}, PageLimit={PageLimit}, MaxPages={MaxPages}, MaxCompanies={MaxCompanies}, Resume={Resume}, SkipExistingCompanies={SkipExistingCompanies}",
+            "CEIDG mirror worker started. ImportEnabled={ImportEnabled}, RunOnce={RunOnce}, Source={Source}, StartPage={StartPage}, PageLimit={PageLimit}, MaxPages={MaxPages}, MaxCompanies={MaxCompanies}, Resume={Resume}, SkipExistingCompanies={SkipExistingCompanies}, HasJwtToken={HasJwtToken}, JwtTokenLength={JwtTokenLength}",
             importOptions.Enabled,
             importOptions.RunOnce,
             importOptions.Source,
@@ -20,7 +22,9 @@ public class Worker(
             importOptions.MaxPages,
             importOptions.MaxCompanies,
             importOptions.Resume,
-            importOptions.SkipExistingCompanies);
+            importOptions.SkipExistingCompanies,
+            !string.IsNullOrWhiteSpace(ceidgApiOptions.JwtToken),
+            ceidgApiOptions.JwtToken?.Length ?? 0);
 
         if (importOptions.RunOnce)
         {
