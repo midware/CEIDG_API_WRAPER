@@ -180,6 +180,10 @@ HasJwtToken=True, JwtTokenLength=...
 
 If `HasJwtToken=False`, the container did not receive `CEIDG_JWT_TOKEN`. If it is `True` but CEIDG still returns `401`, the token is invalid, expired, truncated, or contains accidental spaces/newlines.
 
+### Missing ASP.NET Docker tag during API build
+
+If Docker reports that `mcr.microsoft.com/dotnet/aspnet:10.0-bookworm-slim` is not found, pull the latest repo version. `Dockerfile.api` intentionally uses `mcr.microsoft.com/dotnet/sdk:10.0` as the final image because it is available for this project target and includes the ASP.NET runtime needed by the API.
+
 ### Missing libgssapi_krb5.so.2
 
 The worker/API Dockerfiles install `libgssapi-krb5-2`. Rebuild without cache:
@@ -209,3 +213,5 @@ docker compose exec -T postgres psql -U ceidg -d ceidg_mirror < db/migrations/20
 
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
+
+
