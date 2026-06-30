@@ -228,6 +228,65 @@ ul { padding-left: 18px; }
 
 
 
+
+
+.revoked-key {
+  background: #f4f7f8;
+  color: #7b8b92;
+}
+
+.revoked-key td,
+.revoked-key code {
+  color: #7b8b92 !important;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-active {
+  background: #e7f6f2;
+  color: #087f7a;
+}
+
+.status-revoked {
+  background: #e7ecef;
+  color: #6c7b82;
+}
+
+.panel-table small {
+  display: block;
+  margin-top: 4px;
+  color: #87969c;
+  font-size: 11px;
+}
+
+.inline-action-form {
+  margin: 0;
+}
+
+.button-small {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.button-danger {
+  border-color: #ead0cc;
+  background: #fff4f2;
+  color: #a43b2f;
+}
+
+.button-danger:hover {
+  background: #ffe8e3;
+}
+
 .legal-shell {
   width: min(1040px, calc(100% - 36px));
   margin: 0 auto;

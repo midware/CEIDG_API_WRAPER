@@ -46,6 +46,19 @@ public static class LeadbaseSiteEndpoints
         })
         .ExcludeFromDescription();
 
+        app.MapPost("/app/api-keys/{keyId:guid}/revoke", async (HttpContext context, Guid keyId, ProductApiStore store, CancellationToken cancellationToken) =>
+        {
+            var userId = GetSignedInUserId(context);
+            if (userId is null)
+            {
+                return Results.Redirect("/login");
+            }
+
+            await store.RevokeApiKeyAsync(userId.Value, keyId, cancellationToken);
+            return Results.Redirect("/app#api-keys");
+        })
+        .ExcludeFromDescription();
+
         app.MapGet("/demo/companies", (HttpContext context, string? name, string? city, string? mainPkdCode, string? columns) =>
         {
             var key = GetAnonymousDemoKey(context);
@@ -202,11 +215,29 @@ public static class LeadbaseSiteEndpoints
         }
 
         return """
-          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Nazwa</th><th>Prefiks</th><th>Utworzony</th><th>Ostatnie użycie</th></tr></thead><tbody>
-""" + string.Join(string.Empty, apiKeys.Select(key => $"""
-            <tr><td>{Html(key.Name ?? "Bez nazwy")}</td><td><code>{Html(key.KeyPrefix)}</code></td><td>{FormatDate(key.CreatedAtUtc)}</td><td>{FormatDate(key.LastUsedAtUtc)}</td></tr>
-""")) + """
+          <div class="table-wrap panel-table-wrap"><table class="panel-table"><thead><tr><th>Nazwa</th><th>Prefiks</th><th>Status</th><th>Utworzony</th><th>Ostatnie użycie</th><th>Akcje</th></tr></thead><tbody>
+""" + string.Join(string.Empty, apiKeys.Select(RenderApiKeyRow)) + """
           </tbody></table></div>
+""";
+    }
+
+    private static string RenderApiKeyRow(AccountApiKey key)
+    {
+        var isRevoked = key.RevokedAtUtc is not null;
+        var rowClass = isRevoked ? " class=\"revoked-key\"" : string.Empty;
+        var status = isRevoked
+            ? $"<span class=\"status-pill status-revoked\">Unieważniony</span><small>od {FormatDate(key.RevokedAtUtc)}</small>"
+            : "<span class=\"status-pill status-active\">Aktywny</span>";
+        var actions = isRevoked
+            ? "<span class=\"muted-cell\">Brak akcji</span>"
+            : $"""
+              <form class="inline-action-form" method="post" action="/app/api-keys/{key.Id}/revoke" onsubmit="return confirm('Unieważnić ten klucz API? Po tej operacji nie będzie można używać go w API.');">
+                <button class="button button-danger button-small" type="submit">Unieważnij</button>
+              </form>
+""";
+
+        return $"""
+            <tr{rowClass}><td>{Html(key.Name ?? "Bez nazwy")}</td><td><code>{Html(key.KeyPrefix)}</code></td><td>{status}</td><td>{FormatDate(key.CreatedAtUtc)}</td><td>{FormatDate(key.LastUsedAtUtc)}</td><td>{actions}</td></tr>
 """;
     }
 

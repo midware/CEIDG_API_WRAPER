@@ -41,7 +41,7 @@ public sealed record AccountPanel(
     IReadOnlyList<AccountLedgerEntry> Ledger,
     IReadOnlyList<AccountQueryLog> QueryLogs);
 
-public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc);
+public sealed record AccountApiKey(Guid Id, string KeyPrefix, string? Name, DateTimeOffset CreatedAtUtc, DateTimeOffset? LastUsedAtUtc, DateTimeOffset? RevokedAtUtc);
 public sealed record AccountLedgerEntry(DateTimeOffset CreatedAtUtc, long Delta, long BalanceAfter, string Reason);
 public sealed record AccountQueryLog(DateTimeOffset CreatedAtUtc, string Endpoint, IReadOnlyList<string> SelectedColumns, int ReturnedRows, long TokenCost);
 
@@ -362,6 +362,20 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         return key;
     }
 
+    public async Task<bool> RevokeApiKeyAsync(Guid userId, Guid apiKeyId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            update app.api_keys
+            set revoked_at_utc = now()
+            where id = $1
+              and user_id = $2
+              and revoked_at_utc is null
+            """);
+        command.Parameters.AddWithValue(apiKeyId);
+        command.Parameters.AddWithValue(userId);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
     public async Task<AccountPanel?> GetAccountPanelAsync(Guid userId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""
@@ -395,12 +409,11 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
 
         var apiKeys = new List<AccountApiKey>();
         await using (var keysCommand = dataSource.CreateCommand("""
-            select id, key_prefix, name, created_at_utc, last_used_at_utc
+            select id, key_prefix, name, created_at_utc, last_used_at_utc, revoked_at_utc
             from app.api_keys
             where user_id = $1
-              and revoked_at_utc is null
             order by created_at_utc desc
-            limit 10
+            limit 20
             """))
         {
             keysCommand.Parameters.AddWithValue(userId);
@@ -412,7 +425,8 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
                     keysReader.GetString(1),
                     await keysReader.IsDBNullAsync(2, cancellationToken) ? null : keysReader.GetString(2),
                     keysReader.GetFieldValue<DateTimeOffset>(3),
-                    await keysReader.IsDBNullAsync(4, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(4)));
+                    await keysReader.IsDBNullAsync(4, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(4),
+                    await keysReader.IsDBNullAsync(5, cancellationToken) ? null : keysReader.GetFieldValue<DateTimeOffset>(5)));
             }
         }
 
