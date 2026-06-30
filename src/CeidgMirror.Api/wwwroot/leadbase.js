@@ -23,8 +23,8 @@
   function updateCounter() {
     const remaining = Math.max(0, maxDemoUses - getDemoUses());
     counter.textContent = remaining > 0
-      ? `Demo: pozosta³y ${remaining} darmowe zapytania bez konta.`
-      : 'Demo wykorzystane. Wpisz API key albo utwórz konto.';
+      ? `Demo: pozostaÅ‚y ${remaining} darmowe zapytania bez konta.`
+      : 'Demo wykorzystane. Wpisz API key albo utwÃ³rz konto.';
     gate.hidden = remaining > 0;
   }
 
@@ -53,7 +53,7 @@
     table.querySelector('thead').innerHTML = `<tr>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr>`;
     table.querySelector('tbody').innerHTML = rows.map((row) => (
       `<tr>${columns.map((column) => `<td>${formatCell(row[column])}</td>`).join('')}</tr>`
-    )).join('') || `<tr><td colspan="${columns.length || 1}">Brak wyników dla podanych filtrów.</td></tr>`;
+    )).join('') || `<tr><td colspan="${columns.length || 1}">Brak wynikÃ³w dla podanych filtrÃ³w.</td></tr>`;
   }
 
   function formatCell(value) {
@@ -81,7 +81,7 @@
 
     if (!isAuthenticated && getDemoUses() >= maxDemoUses) {
       status.textContent = 'Wymagana rejestracja';
-      jsonBox.textContent = 'Limit 2 zapytañ demo zosta³ wykorzystany. Utwórz konto lub wpisz API key.';
+      jsonBox.textContent = 'Limit 2 zapytaÅ„ demo zostaÅ‚ wykorzystany. UtwÃ³rz konto lub wpisz API key.';
       gate.hidden = false;
       return;
     }
@@ -89,14 +89,14 @@
     const params = queryFromForm(data, isAuthenticated);
     const endpoint = isAuthenticated ? `/companies?${params}` : `/demo/companies?${params}`;
     urlLabel.textContent = `GET ${endpoint}`;
-    status.textContent = 'Wysy³anie zapytania...';
+    status.textContent = 'WysyÅ‚anie zapytania...';
 
     const headers = isAuthenticated ? { 'X-Api-Key': apiKey } : {};
     const response = await fetch(endpoint, { headers });
-    const payload = await response.json().catch(() => ({ error: 'Nie uda³o siê odczytaæ odpowiedzi JSON.' }));
+    const payload = await response.json().catch(() => ({ error: 'Nie udaÅ‚o siÄ™ odczytaÄ‡ odpowiedzi JSON.' }));
 
     if (!response.ok) {
-      status.textContent = payload.registrationRequired ? 'Wymagana rejestracja' : `B³¹d ${response.status}`;
+      status.textContent = payload.registrationRequired ? 'Wymagana rejestracja' : `BÅ‚Ä…d ${response.status}`;
       jsonBox.textContent = JSON.stringify(payload, null, 2);
       if (payload.registrationRequired) gate.hidden = false;
       return;
@@ -107,8 +107,8 @@
     }
 
     status.textContent = isAuthenticated
-      ? `Pobrano ${payload.returnedRows ?? payload.items?.length ?? 0} rekordów. Tokeny: ${payload.tokenCost ?? '-'}`
-      : `Demo OK. Pozosta³o ${payload.demoUsesRemaining ?? Math.max(0, maxDemoUses - getDemoUses())} prób.`;
+      ? `Pobrano ${payload.returnedRows ?? payload.items?.length ?? 0} rekordÃ³w. Tokeny: ${payload.tokenCost ?? '-'}`
+      : `Demo OK. PozostaÅ‚o ${payload.demoUsesRemaining ?? Math.max(0, maxDemoUses - getDemoUses())} prÃ³b.`;
     renderTable(payload.items || []);
     jsonBox.textContent = JSON.stringify(payload, null, 2);
   }
