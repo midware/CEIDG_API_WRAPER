@@ -381,6 +381,167 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task UpsertKrsCompanyAsync(
+        KrsCompanyRecord record,
+        Guid importRunId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        Guid? existingId = null;
+        await using (var find = new NpgsqlCommand("""
+            select id
+            from ceidg.company_records
+            where krs_number = $1
+               or ($2 is not null and (nip = $2 or krs_nip = $2))
+               or ($3 is not null and (regon = $3 or krs_regon = $3))
+            order by case
+                when krs_number = $1 then 1
+                when $2 is not null and nip = $2 then 2
+                when $3 is not null and regon = $3 then 3
+                else 4
+            end
+            limit 1
+            for update
+            """, connection, transaction))
+        {
+            Add(find, record.KrsNumber);
+            Add(find, record.Nip);
+            Add(find, record.Regon);
+            var result = await find.ExecuteScalarAsync(cancellationToken);
+            if (result is Guid id)
+            {
+                existingId = id;
+            }
+        }
+
+        if (existingId is not null)
+        {
+            await using var update = new NpgsqlCommand("""
+                update ceidg.company_records
+                set registry_sources = (
+                        select array_agg(distinct source)
+                        from unnest(array_append(coalesce(registry_sources, array[]::text[]), 'KRS')) as source
+                    ),
+                    krs_number = $2,
+                    krs_register_type = $3,
+                    krs_legal_form = $4,
+                    krs_court_name = $5,
+                    krs_registration_date = $6,
+                    krs_last_entry_date = $7,
+                    krs_status = $8,
+                    krs_nip = $9,
+                    krs_regon = $10,
+                    krs_name = $11,
+                    krs_address = $12::jsonb,
+                    krs_representatives = $13::jsonb,
+                    raw_krs_payload = $14::jsonb,
+                    krs_updated_at_utc = $15,
+                    source_detail_url = coalesce(source_detail_url, $16),
+                    last_detail_source_hash = coalesce(last_detail_source_hash, $17),
+                    last_import_run_id = $18,
+                    nip = coalesce(nullif(nip, ''), $9),
+                    regon = coalesce(nullif(regon, ''), $10),
+                    name = coalesce(nullif(name, ''), $11),
+                    updated_at_utc = now()
+                where id = $1
+                """, connection, transaction);
+            Add(update, existingId.Value);
+            AddKrsParameters(update, record, importRunId);
+            await update.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        await using (var insert = new NpgsqlCommand("""
+            insert into ceidg.company_records (
+                id,
+                ceidg_id,
+                source_index_url,
+                source_detail_url,
+                last_index_source_hash,
+                last_detail_source_hash,
+                first_seen_at_utc,
+                updated_at_utc,
+                last_import_run_id,
+                registry_sources,
+                raw_index_payload,
+                raw_detail_payload,
+                raw_krs_payload,
+                nip,
+                regon,
+                name,
+                krs_number,
+                krs_register_type,
+                krs_legal_form,
+                krs_court_name,
+                krs_registration_date,
+                krs_last_entry_date,
+                krs_status,
+                krs_nip,
+                krs_regon,
+                krs_name,
+                krs_address,
+                krs_representatives,
+                krs_updated_at_utc,
+                extraction_version,
+                extraction_warnings
+            )
+            values (
+                $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
+                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, 1, '[]'::jsonb
+            )
+            """, connection, transaction))
+        {
+            Add(insert, Guid.NewGuid());
+            Add(insert, record.SourceUri.ToString());
+            Add(insert, Sha256(record.RawJson));
+            Add(insert, importRunId);
+            AddJson(insert, record.RawJson);
+            Add(insert, record.Nip);
+            Add(insert, record.Regon);
+            Add(insert, record.Name);
+            Add(insert, record.KrsNumber);
+            Add(insert, record.RegisterType);
+            Add(insert, record.LegalForm);
+            Add(insert, record.CourtName);
+            Add(insert, record.RegistrationDate);
+            Add(insert, record.LastEntryDate);
+            Add(insert, record.Status);
+            Add(insert, record.Nip);
+            Add(insert, record.Regon);
+            Add(insert, record.Name);
+            AddJson(insert, record.AddressJson);
+            AddJson(insert, record.RepresentativesJson);
+            Add(insert, record.FetchedAtUtc);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static void AddKrsParameters(NpgsqlCommand command, KrsCompanyRecord record, Guid importRunId)
+    {
+        Add(command, record.KrsNumber);
+        Add(command, record.RegisterType);
+        Add(command, record.LegalForm);
+        Add(command, record.CourtName);
+        Add(command, record.RegistrationDate);
+        Add(command, record.LastEntryDate);
+        Add(command, record.Status);
+        Add(command, record.Nip);
+        Add(command, record.Regon);
+        Add(command, record.Name);
+        AddJson(command, record.AddressJson);
+        AddJson(command, record.RepresentativesJson);
+        AddJson(command, record.RawJson);
+        Add(command, record.FetchedAtUtc);
+        Add(command, record.SourceUri.ToString());
+        Add(command, Sha256(record.RawJson));
+        Add(command, importRunId);
+    }
+
     public async Task UpsertReportPayloadAsync(
         CeidgReportDescriptor report,
         CeidgRawResponse payloadResponse,

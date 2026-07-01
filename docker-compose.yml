@@ -39,6 +39,15 @@ services:
       CeidgApi__MinimumRequestIntervalSeconds: 4
       CeidgApi__RequestTimeoutSeconds: 300
       Postgres__ConnectionString: ${POSTGRES_CONNECTION_STRING:-Host=postgres;Port=5432;Database=ceidg_mirror;Username=ceidg;Password=ceidg_dev_password}
+      KrsImport__Enabled: ${KRS_IMPORT_ENABLED:-false}
+      KrsImport__Source: ${KRS_IMPORT_SOURCE:-SeededNumbers}
+      KrsImport__BaseUrl: https://api-krs.ms.gov.pl/
+      KrsImport__Register: ${KRS_IMPORT_REGISTER:-P}
+      KrsImport__Resume: "true"
+      KrsImport__MaxItems: ${KRS_IMPORT_MAX_ITEMS:-0}
+      KrsImport__RequestLimit: 60
+      KrsImport__WindowSeconds: 60
+      KrsImport__MinimumRequestIntervalSeconds: 1
       Import__Enabled: "true"
       Import__RunOnce: "false"
       Import__Source: ChangesApi

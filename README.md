@@ -1,4 +1,4 @@
-# CEIDG_API_WRAPER
+﻿# CEIDG_API_WRAPER
 
 C#/.NET solution for mirroring CEIDG company data into PostgreSQL and exposing a paid/token-billed API over the local mirror.
 
@@ -77,6 +77,34 @@ Request pacing:
 - 1000 requests / 3600 seconds.
 - Smooth interval: `CeidgApi__MinimumRequestIntervalSeconds=4`.
 
+## KRS Import
+
+KRS data is stored in the same `ceidg.company_records` table. Existing CEIDG rows are matched by KRS, NIP or REGON; if no row exists, the worker creates a KRS-only company row with `registry_sources={KRS}`.
+
+Official PRS OpenAPI base URL is read from the public PRS configuration as `https://api-krs.ms.gov.pl/`. The worker currently supports:
+
+- `SeededNumbers` - import specific KRS numbers from `KrsImport__SeedKrsNumbers`.
+- `Bulletin` - read `api/Krs/Biuletyn/{dzien}`, extract KRS numbers, then fetch current excerpts.
+
+PowerShell smoke import for one KRS number:
+
+```powershell
+$env:Import__Enabled = "false"
+$env:Import__RunOnce = "true"
+$env:KrsImport__Enabled = "true"
+$env:KrsImport__Source = "SeededNumbers"
+$env:KrsImport__SeedKrsNumbers__0 = "0000120353"
+$env:KrsImport__MaxItems = "1"
+dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
+```
+
+KRS pacing defaults:
+
+- 60 requests / 60 seconds.
+- Smooth interval: `KrsImport__MinimumRequestIntervalSeconds=1`.
+
+For a full KRS bootstrap, start with a controlled seed or daily bulletin window and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`.
+
 ## API Locally
 
 Use `CeidgMirror.Api` as the startup project.
@@ -110,7 +138,7 @@ Invoke-RestMethod -Headers $headers "http://localhost:5075/companies?page=1&page
 
 Token cost depends on selected column weights and returned row count. Insufficient balance returns HTTP `402 Payment Required`.
 
-The product website includes a graphical endpoint tester. Anonymous visitors can run 2 demo calls. After that, the UI requires registration or an API key. The tester exposes the full selectable company column set, including contact, address, owner, PKD and raw payload fields.
+The product website includes a graphical endpoint tester. Anonymous visitors can run 2 demo calls. After that, the UI requires registration or an API key. The public tester intentionally exposes a narrow preview set without contact fields or raw payloads. Full API clients can still select all authorized columns through `/companies`.
 
 ## Docker On Server
 

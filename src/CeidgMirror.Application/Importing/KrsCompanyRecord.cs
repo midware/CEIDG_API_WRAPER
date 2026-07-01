@@ -1,0 +1,18 @@
+namespace CeidgMirror.Application.Importing;
+
+public sealed record KrsCompanyRecord(
+    string KrsNumber,
+    string RegisterType,
+    string? LegalForm,
+    string? CourtName,
+    DateOnly? RegistrationDate,
+    DateOnly? LastEntryDate,
+    string? Status,
+    string? Nip,
+    string? Regon,
+    string? Name,
+    string? AddressJson,
+    string? RepresentativesJson,
+    string RawJson,
+    Uri SourceUri,
+    DateTimeOffset FetchedAtUtc);

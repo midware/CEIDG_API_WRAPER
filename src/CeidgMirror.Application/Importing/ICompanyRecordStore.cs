@@ -31,6 +31,11 @@ public interface ICompanyRecordStore
         Guid importRunId,
         CancellationToken cancellationToken = default);
 
+    Task UpsertKrsCompanyAsync(
+        KrsCompanyRecord record,
+        Guid importRunId,
+        CancellationToken cancellationToken = default);
+
     Task UpsertReportPayloadAsync(
         CeidgReportDescriptor report,
         CeidgRawResponse payloadResponse,
