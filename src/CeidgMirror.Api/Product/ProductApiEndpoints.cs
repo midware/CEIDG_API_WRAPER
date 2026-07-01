@@ -188,6 +188,7 @@ public static class ProductApiEndpoints
             [FromQuery] bool? hasPhone,
             [FromQuery] bool? hasEmail,
             [FromQuery] bool? hasWebsite,
+            [FromQuery] bool? includeHistory,
             CancellationToken cancellationToken) =>
         {
             var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
@@ -206,7 +207,7 @@ public static class ProductApiEndpoints
             pageSize = pageSize <= 0 ? options.DefaultPageSize : pageSize;
             pageSize = Math.Min(pageSize, options.MaxPageSize);
 
-            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, country, voivodeship, county, municipality, city, status, mainPkdCode, legalForm, registrySource, krsNumber, hasKrs, hasPhone, hasEmail, hasWebsite, selectedColumns);
+            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, country, voivodeship, county, municipality, city, status, mainPkdCode, legalForm, registrySource, krsNumber, hasKrs, hasPhone, hasEmail, hasWebsite, includeHistory == true, selectedColumns);
             var result = await store.SearchCompaniesAsync(user.UserId, user.ApiKeyId, query, cancellationToken);
 
             if (!result.Success)
@@ -227,7 +228,7 @@ public static class ProductApiEndpoints
                 result.Items));
         })
         .WithSummary("Search CEIDG/KRS companies with selectable columns, filters and token billing")
-        .WithDescription("Returns paginated company records from the local mirror. The columns query parameter accepts values from GET /companies/columns. Contact columns and raw payloads have higher token weight.")
+        .WithDescription("Returns paginated current company records from the local mirror by default. Set includeHistory=true to include historical CEIDG/KRS entries for the same NIP/KRS/REGON identity. The columns query parameter accepts values from GET /companies/columns.")
         .Produces<CompanySearchResponse>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)
         .Produces(StatusCodes.Status402PaymentRequired);
@@ -331,7 +332,7 @@ public static class ProductApiEndpoints
             return Results.Ok(await operationsStore.GetDataQualityReportAsync(cancellationToken));
         })
         .WithSummary("Get data quality report for the mirrored company table")
-        .WithDescription("Returns operational counts for missing identifiers, invalid countries, invalid phones and duplicate NIP/REGON/KRS groups. This endpoint is informational and does not debit tokens.")
+        .WithDescription("Returns operational counts for missing identifiers, invalid countries, invalid phones, NIP history groups and duplicate current identifiers. This endpoint is informational and does not debit tokens.")
         .Produces<DataQualityReportResponse>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized);
 
@@ -677,6 +678,10 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
     public async Task<CompanySearchResult> SearchCompaniesAsync(Guid userId, Guid apiKeyId, CompanySearchQuery query, CancellationToken cancellationToken)
     {
         var where = new List<string>();
+        if (!query.IncludeHistory)
+        {
+            where.Add("is_current");
+        }
         var parameters = new List<NpgsqlParameter>();
         AddTextFilter(where, parameters, "nip", query.Nip, exact: true);
         AddTextFilter(where, parameters, "regon", query.Regon, exact: true);
@@ -718,7 +723,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
             select {selectSql}
             from ceidg.company_records
             {whereSql}
-            order by updated_at_utc desc, ceidg_id
+            order by is_current desc, current_rank asc, coalesce(ended_on, removed_on, suspended_on, resumed_on, registered_on, started_on, updated_at_utc::date) desc nulls last, updated_at_utc desc, ceidg_id
             limit @limit offset @offset
             """, connection))
         {
@@ -912,7 +917,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
 }
 
 public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance, bool EmailConfirmed);
-public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? Country, string? Voivodeship, string? County, string? Municipality, string? City, string? Status, string? MainPkdCode, string? LegalForm, string? RegistrySource, string? KrsNumber, bool? HasKrs, bool? HasPhone, bool? HasEmail, bool? HasWebsite, IReadOnlyList<CompanyColumn> Columns);
+public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? Country, string? Voivodeship, string? County, string? Municipality, string? City, string? Status, string? MainPkdCode, string? LegalForm, string? RegistrySource, string? KrsNumber, bool? HasKrs, bool? HasPhone, bool? HasEmail, bool? HasWebsite, bool IncludeHistory, IReadOnlyList<CompanyColumn> Columns);
 
 public sealed record CompanySearchResult(bool Success, IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, long TotalRows, long TokenCost, long TokenBalanceAfter)
 {
@@ -935,6 +940,8 @@ public static class CompanyColumnCatalog
         new CompanyColumn("name", "name", "name", "Business name", 1),
         new CompanyColumn("status", "status", "status", "Business status", 1),
         new CompanyColumn("statusNumber", "status_number", "status_number", "CEIDG status number", 1),
+        new CompanyColumn("isCurrent", "is_current", "is_current", "Whether this row is the current record for the company identity", 1),
+        new CompanyColumn("currentRank", "current_rank", "current_rank", "Current-row priority rank", 1),
         new CompanyColumn("legalForm", "legal_form", "legal_form", "Unified legal form", 1),
         new CompanyColumn("registeredOn", "registered_on", "registered_on", "Unified registration/start date", 1),
         new CompanyColumn("startedOn", "started_on", "started_on", "CEIDG business start date", 1),

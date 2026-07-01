@@ -187,7 +187,7 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
 
     private static string BuildWhere(AnalyticsFilter filter, out List<NpgsqlParameter> parameters)
     {
-        var where = new List<string>();
+        var where = new List<string> { "is_current" };
         parameters = [];
 
         AddTextFilter(where, parameters, "business_address_voivodeship", filter.Voivodeship, exact: true);

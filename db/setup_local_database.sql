@@ -35,6 +35,8 @@ create table if not exists ceidg.company_records (
     first_seen_at_utc timestamptz not null,
     updated_at_utc timestamptz not null,
     last_import_run_id uuid null references source.import_run(id),
+    is_current boolean not null default false,
+    current_rank integer not null default 4,
     registry_sources text[] not null default array['CEIDG']::text[],
 
     -- Full source payloads. These JSONB columns are mandatory so no CEIDG field is lost
@@ -131,6 +133,10 @@ create index if not exists ix_company_records_regon on ceidg.company_records (re
 create index if not exists ix_company_records_owner_nip on ceidg.company_records (owner_nip);
 create index if not exists ix_company_records_owner_regon on ceidg.company_records (owner_regon);
 create index if not exists ix_company_records_status on ceidg.company_records (status);
+create index if not exists ix_company_records_is_current on ceidg.company_records (is_current);
+create index if not exists ix_company_records_current_rank on ceidg.company_records (current_rank);
+create index if not exists ix_company_records_current_nip on ceidg.company_records (nip) where is_current and nullif(trim(coalesce(nip, '')), '') is not null;
+create index if not exists ix_company_records_current_krs_number on ceidg.company_records (krs_number) where is_current and nullif(trim(coalesce(krs_number, '')), '') is not null;
 create index if not exists ix_company_records_phone_mobile on ceidg.company_records (phone_mobile);
 create index if not exists ix_company_records_phone_landline on ceidg.company_records (phone_landline);
 create index if not exists ix_company_records_phones_json on ceidg.company_records using gin (phones_json);

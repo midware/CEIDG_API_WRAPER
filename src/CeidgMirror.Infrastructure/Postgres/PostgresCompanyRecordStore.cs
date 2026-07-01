@@ -165,6 +165,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         var owner = TryGetProperty(firma, "wlasciciel", out var ownerElement) ? ownerElement : default;
         var address = TryGetProperty(firma, "adresDzialalnosci", out var addressElement) ? addressElement : default;
         var normalizedPhones = CompanyDataNormalizer.NormalizePhones(ReadString(firma, "telefon"));
+        var normalizedNip = CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "nip") ?? ReadString(owner, "nip") ?? indexItem?.Nip);
+        var normalizedRegon = CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "regon") ?? ReadString(owner, "regon") ?? indexItem?.Regon);
 
         await using var command = dataSource.CreateCommand("""
             insert into ceidg.company_records (
@@ -329,8 +331,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, importRunId);
         AddJson(command, indexItem?.RawJson);
         AddJson(command, detailJson);
-        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "nip") ?? ReadString(owner, "nip") ?? indexItem?.Nip));
-        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "regon") ?? ReadString(owner, "regon") ?? indexItem?.Regon));
+        Add(command, normalizedNip);
+        Add(command, normalizedRegon);
         Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "nazwa")));
         Add(command, CompanyDataNormalizer.NormalizeStatus(ReadString(firma, "status")));
         Add(command, ReadInt(firma, "numerStatusu"));
@@ -390,6 +392,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         AddJson(command, normalizedPhones.Json);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await RefreshCurrentFlagsAsync(normalizedNip, null, normalizedRegon, ceidgId, cancellationToken);
     }
 
     public async Task UpsertKrsCompanyAsync(
@@ -469,6 +472,14 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(update, existingId.Value);
             AddKrsParameters(update, record, importRunId);
             await update.ExecuteNonQueryAsync(cancellationToken);
+            await RefreshCurrentFlagsAsync(
+                connection,
+                transaction,
+                CompanyDataNormalizer.NormalizeDigits(record.Nip),
+                record.KrsNumber,
+                CompanyDataNormalizer.NormalizeDigits(record.Regon),
+                null,
+                cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return;
         }
@@ -541,9 +552,91 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await RefreshCurrentFlagsAsync(
+            connection,
+            transaction,
+            CompanyDataNormalizer.NormalizeDigits(record.Nip),
+            record.KrsNumber,
+            CompanyDataNormalizer.NormalizeDigits(record.Regon),
+            null,
+            cancellationToken);
+
         await transaction.CommitAsync(cancellationToken);
     }
 
+
+    private async Task RefreshCurrentFlagsAsync(
+        string? nip,
+        string? krsNumber,
+        string? regon,
+        string? ceidgId,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await RefreshCurrentFlagsAsync(connection, null, nip, krsNumber, regon, ceidgId, cancellationToken);
+    }
+
+    private static async Task RefreshCurrentFlagsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string? nip,
+        string? krsNumber,
+        string? regon,
+        string? ceidgId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            with affected as (
+                select id,
+                       case upper(coalesce(status, ''))
+                           when 'AKTYWNY' then 1
+                           when 'ACTIVE' then 1
+                           when 'ZAWIESZONY' then 2
+                           when 'WYKRESLONY' then 3
+                           else 4
+                       end as rank_value,
+                       row_number() over (
+                           order by
+                               case upper(coalesce(status, ''))
+                                   when 'AKTYWNY' then 1
+                                   when 'ACTIVE' then 1
+                                   when 'ZAWIESZONY' then 2
+                                   when 'WYKRESLONY' then 3
+                                   else 4
+                               end,
+                               coalesce(ended_on, removed_on, suspended_on, resumed_on, registered_on, started_on, updated_at_utc::date, date '0001-01-01') desc,
+                               updated_at_utc desc,
+                               id
+                       ) as rn
+                from ceidg.company_records
+                where ($1::text is not null and nip = $1::text)
+                   or ($1::text is null and $2::text is not null and krs_number = $2::text)
+                   or ($1::text is null and $2::text is null and $3::text is not null and regon = $3::text)
+                   or ($1::text is null and $2::text is null and $3::text is null and $4::text is not null and upper(ceidg_id) = upper($4::text))
+            )
+            update ceidg.company_records c
+            set is_current = affected.rn = 1,
+                current_rank = affected.rank_value
+            from affected
+            where affected.id = c.id
+            """, connection, transaction);
+        Add(command, nip);
+        Add(command, NormalizeKrsNumberOrNull(krsNumber));
+        Add(command, regon);
+        Add(command, ceidgId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string? NormalizeKrsNumberOrNull(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? null : digits.PadLeft(10, '0');
+    }
     private static void AddKrsParameters(NpgsqlCommand command, KrsCompanyRecord record, Guid importRunId)
     {
         Add(command, record.KrsNumber);

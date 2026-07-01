@@ -137,7 +137,7 @@ Core endpoints:
 - `GET /login`, `POST /login`, `GET /logout` - web login/logout with cookie session.
 - `GET /companies/columns` - lists selectable columns and token weights.
 - `GET /companies` - paginated company search with dynamic columns; requires `X-Api-Key`.
-- `GET /operations/data-quality` - data quality snapshot: missing NIP/REGON, invalid countries/phones, street prefix leftovers and duplicate NIP/REGON/KRS groups; requires `X-Api-Key`.
+- `GET /operations/data-quality` - data quality snapshot: missing NIP/REGON, invalid countries/phones, street prefix leftovers, NIP history groups and duplicate current identifiers; requires `X-Api-Key`.
 - `GET /operations/import-metrics` - CEIDG/KRS import monitoring: last run, last checkpoint, imported/skipped/failed counts, running runs and last-run throughput; requires `X-Api-Key`.
 
 Example:

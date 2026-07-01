@@ -329,8 +329,8 @@ public static class LeadbaseSiteEndpoints
             ("Błędne kraje", quality.Address.InvalidCountryRows.ToString("N0")),
             ("Ulice z prefiksem", quality.Address.StreetWithPrefixRows.ToString("N0")),
             ("Błędne telefony", quality.Contact.InvalidPhoneRows.ToString("N0")),
-            ("Duplikaty NIP", quality.Duplicates.DuplicateNipGroups.ToString("N0")),
-            ("Duplikaty KRS", quality.Duplicates.DuplicateKrsGroups.ToString("N0"))
+            ("NIP z historią", quality.Duplicates.NipHistoryGroups.ToString("N0")),
+            ("Wiele aktualnych NIP", quality.Duplicates.MultiCurrentNipGroups.ToString("N0"))
         };
 
         return $"""
@@ -339,7 +339,7 @@ public static class LeadbaseSiteEndpoints
           </div>
           <div class="quality-details">
             <div><strong>Kontakt</strong><span>Brak telefonu: {quality.Contact.MissingPhoneRows:N0}</span><span>Brak email: {quality.Contact.MissingEmailRows:N0}</span><span>Brak WWW: {quality.Contact.MissingWebsiteRows:N0}</span></div>
-            <div><strong>Identyfikatory</strong><span>Brak NIP i REGON: {quality.Identity.MissingNipAndRegon:N0}</span><span>Duplikowane REGON: {quality.Duplicates.DuplicateRegonGroups:N0} grup / {quality.Duplicates.DuplicateRegonRows:N0} wierszy</span></div>
+            <div><strong>Identyfikatory</strong><span>Brak NIP i REGON: {quality.Identity.MissingNipAndRegon:N0}</span><span>Historia NIP: {quality.Duplicates.NipHistoryGroups:N0} grup / {quality.Duplicates.NipHistoryRows:N0} wierszy</span><span>Wiele aktualnych NIP: {quality.Duplicates.MultiCurrentNipGroups:N0} grup / {quality.Duplicates.MultiCurrentNipRows:N0} wierszy</span></div>
             <div><strong>Wygenerowano</strong><span>{FormatDate(quality.GeneratedAtUtc)}</span></div>
           </div>
 """;

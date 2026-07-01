@@ -7,7 +7,7 @@ public sealed record QualitySample(string Value, long Count);
 public sealed record IdentityQuality(long MissingNip, long MissingRegon, long MissingNipAndRegon);
 public sealed record AddressQuality(long InvalidCountryRows, long StreetWithPrefixRows, long MissingCityRows, IReadOnlyList<QualitySample> InvalidCountries);
 public sealed record ContactQuality(long MissingPhoneRows, long InvalidPhoneRows, long MissingEmailRows, long InvalidEmailRows, long MissingWebsiteRows, IReadOnlyList<QualitySample> InvalidPhones);
-public sealed record DuplicateQuality(long DuplicateNipGroups, long DuplicateNipRows, long DuplicateRegonGroups, long DuplicateRegonRows, long DuplicateKrsGroups, long DuplicateKrsRows);
+public sealed record DuplicateQuality(long NipHistoryGroups, long NipHistoryRows, long MultiCurrentNipGroups, long MultiCurrentNipRows, long DuplicateRegonGroups, long DuplicateRegonRows, long DuplicateKrsGroups, long DuplicateKrsRows);
 public sealed record DataQualityReportResponse(DateTimeOffset GeneratedAtUtc, long TotalCompanies, IdentityQuality Identity, AddressQuality Address, ContactQuality Contact, DuplicateQuality Duplicates);
 
 public sealed record ImportSkippedBreakdown(long ExistingCompanies, long NotFoundInRegister, long Other, string Explanation);
@@ -116,15 +116,19 @@ public sealed class ProductOperationsStore(NpgsqlDataSource dataSource)
     private static async Task<DuplicateQuality> GetDuplicateQualityAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand("""
-            with nip_dupes as (
+            with nip_history as (
                 select count(*)::bigint as rows_count from ceidg.company_records where nullif(trim(coalesce(nip, '')), '') is not null group by nip having count(*) > 1
+            ), multi_current_nip as (
+                select count(*)::bigint as rows_count from ceidg.company_records where is_current and nullif(trim(coalesce(nip, '')), '') is not null group by nip having count(*) > 1
             ), regon_dupes as (
-                select count(*)::bigint as rows_count from ceidg.company_records where nullif(trim(coalesce(regon, '')), '') is not null group by regon having count(*) > 1
+                select count(*)::bigint as rows_count from ceidg.company_records where is_current and nullif(trim(coalesce(regon, '')), '') is not null group by regon having count(*) > 1
             ), krs_dupes as (
-                select count(*)::bigint as rows_count from ceidg.company_records where nullif(trim(coalesce(krs_number, '')), '') is not null group by krs_number having count(*) > 1
+                select count(*)::bigint as rows_count from ceidg.company_records where is_current and nullif(trim(coalesce(krs_number, '')), '') is not null group by krs_number having count(*) > 1
             )
-            select coalesce((select count(*) from nip_dupes), 0)::bigint,
-                   coalesce((select sum(rows_count) from nip_dupes), 0)::bigint,
+            select coalesce((select count(*) from nip_history), 0)::bigint,
+                   coalesce((select sum(rows_count) from nip_history), 0)::bigint,
+                   coalesce((select count(*) from multi_current_nip), 0)::bigint,
+                   coalesce((select sum(rows_count) from multi_current_nip), 0)::bigint,
                    coalesce((select count(*) from regon_dupes), 0)::bigint,
                    coalesce((select sum(rows_count) from regon_dupes), 0)::bigint,
                    coalesce((select count(*) from krs_dupes), 0)::bigint,
@@ -132,7 +136,7 @@ public sealed class ProductOperationsStore(NpgsqlDataSource dataSource)
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
-        return new DuplicateQuality(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5));
+        return new DuplicateQuality(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7));
     }
 
     private static async Task<IReadOnlyList<QualitySample>> GetSamplesAsync(NpgsqlConnection connection, string column, string predicate, string? phonePattern, CancellationToken cancellationToken)
