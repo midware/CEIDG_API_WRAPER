@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using CeidgMirror.Application.Importing;
 using CeidgMirror.Contracts;
+using CeidgMirror.Infrastructure.Normalization;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -321,16 +322,16 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, importRunId);
         AddJson(command, indexItem?.RawJson);
         AddJson(command, detailJson);
-        Add(command, ReadString(firma, "nip") ?? ReadString(owner, "nip") ?? indexItem?.Nip);
-        Add(command, ReadString(firma, "regon") ?? ReadString(owner, "regon") ?? indexItem?.Regon);
-        Add(command, ReadString(firma, "nazwa"));
-        Add(command, ReadString(firma, "status"));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "nip") ?? ReadString(owner, "nip") ?? indexItem?.Nip));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(firma, "regon") ?? ReadString(owner, "regon") ?? indexItem?.Regon));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "nazwa")));
+        Add(command, CompanyDataNormalizer.NormalizeStatus(ReadString(firma, "status")));
         Add(command, ReadInt(firma, "numerStatusu"));
-        Add(command, ReadString(firma, "telefon"));
-        Add(command, ReadString(firma, "email"));
-        Add(command, ReadString(firma, "www"));
-        Add(command, ReadString(firma, "adresDoreczenElektronicznych"));
-        Add(command, ReadString(firma, "innaFormaKonaktu") ?? ReadString(firma, "innaFormaKontaktu"));
+        Add(command, CompanyDataNormalizer.NormalizePhoneList(ReadString(firma, "telefon")));
+        Add(command, CompanyDataNormalizer.NormalizeEmailList(ReadString(firma, "email")));
+        Add(command, CompanyDataNormalizer.NormalizeWebsiteList(ReadString(firma, "www")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "adresDoreczenElektronicznych")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "innaFormaKonaktu") ?? ReadString(firma, "innaFormaKontaktu")));
         Add(command, ReadInt(firma, "wspolnoscMajatkowa"));
         Add(command, ReadDate(firma, "wspolnoscMajatkowaDataUstania"));
         Add(command, ReadDate(firma, "dataRozpoczecia"));
@@ -341,29 +342,29 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, ReadDate(firma, "dataZgonu"));
         Add(command, ReadDate(firma, "zarzadSukcesyjnyDataUstanowienia"));
         Add(command, ReadDate(firma, "zarzadSukcesyjnyDataWygasniecia"));
-        Add(command, ReadString(firma, "link"));
-        Add(command, ReadString(owner, "imie"));
-        Add(command, ReadString(owner, "nazwisko"));
-        Add(command, ReadString(owner, "nip"));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "link")));
+        Add(command, CompanyDataNormalizer.NormalizePersonName(ReadString(owner, "imie")));
+        Add(command, CompanyDataNormalizer.NormalizePersonName(ReadString(owner, "nazwisko")));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(owner, "nip")));
         Add(command, ReadBool(owner, "nipUchylony"));
         Add(command, ReadBool(owner, "nipUniewazniony"));
-        Add(command, ReadString(owner, "regon"));
-        Add(command, ReadString(address, "kraj"));
-        Add(command, ReadString(address, "wojewodztwo"));
-        Add(command, ReadString(address, "powiat"));
-        Add(command, ReadString(address, "gmina"));
-        Add(command, ReadString(address, "miasto"));
-        Add(command, ReadString(address, "ulica"));
-        Add(command, ReadString(address, "budynek"));
-        Add(command, ReadString(address, "lokal"));
-        Add(command, ReadString(address, "kod"));
-        Add(command, ReadString(address, "skrytkaPocztowa"));
-        Add(command, ReadString(address, "opisNietypowegoMiejsca"));
-        Add(command, ReadString(address, "adresat"));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(owner, "regon")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "kraj"))?.ToUpperInvariant());
+        Add(command, CompanyDataNormalizer.NormalizeVoivodeship(ReadString(address, "wojewodztwo")));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(ReadString(address, "powiat")));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(ReadString(address, "gmina")));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(ReadString(address, "miasto")));
+        Add(command, CompanyDataNormalizer.NormalizeStreet(ReadString(address, "ulica")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "budynek")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "lokal")));
+        Add(command, CompanyDataNormalizer.NormalizePostalCode(ReadString(address, "kod")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "skrytkaPocztowa")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "opisNietypowegoMiejsca")));
+        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "adresat")));
         Add(command, ReadString(address, "terc"));
         Add(command, ReadString(address, "simc"));
         Add(command, ReadString(address, "ulic"));
-        Add(command, ReadPkdCode(firma, "pkdGlowny"));
+        Add(command, CompanyDataNormalizer.NormalizePkdCode(ReadPkdCode(firma, "pkdGlowny")));
         AddJson(command, ReadRaw(firma, "obywatelstwo") ?? ReadRaw(firma, "obywatelstwa"));
         AddJson(command, ReadRaw(firma, "podstawyPrawneWykreslenia"));
         AddJson(command, ReadRaw(firma, "adresKorespondencyjny"));
@@ -407,8 +408,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             """, connection, transaction))
         {
             Add(find, record.KrsNumber);
-            Add(find, record.Nip);
-            Add(find, record.Regon);
+            Add(find, CompanyDataNormalizer.NormalizeDigits(record.Nip));
+            Add(find, CompanyDataNormalizer.NormalizeDigits(record.Regon));
             var result = await find.ExecuteScalarAsync(cancellationToken);
             if (result is Guid id)
             {
@@ -516,10 +517,10 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(insert, Sha256(record.RawJson));
             Add(insert, importRunId);
             AddJson(insert, record.RawJson);
-            Add(insert, record.Nip);
-            Add(insert, record.Regon);
-            Add(insert, record.Name);
-            Add(insert, MapSourceStatusToCanonical(record.Status));
+            Add(insert, CompanyDataNormalizer.NormalizeDigits(record.Nip));
+            Add(insert, CompanyDataNormalizer.NormalizeDigits(record.Regon));
+            Add(insert, CompanyDataNormalizer.CleanText(record.Name));
+            Add(insert, CompanyDataNormalizer.NormalizeStatus(MapSourceStatusToCanonical(record.Status)));
             Add(insert, record.KrsNumber);
             Add(insert, record.RegisterType);
             Add(insert, record.CourtName);
@@ -545,36 +546,39 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.SourceUri.ToString());
         Add(command, Sha256(record.RawJson));
         Add(command, importRunId);
-        Add(command, record.Nip);
-        Add(command, record.Regon);
-        Add(command, record.Name);
-        Add(command, MapSourceStatusToCanonical(record.Status));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(record.Nip));
+        Add(command, CompanyDataNormalizer.NormalizeDigits(record.Regon));
+        Add(command, CompanyDataNormalizer.CleanText(record.Name));
+        Add(command, CompanyDataNormalizer.NormalizeStatus(MapSourceStatusToCanonical(record.Status)));
         AddKrsUnifiedParameters(command, record);
     }
 
     private static void AddKrsUnifiedParameters(NpgsqlCommand command, KrsCompanyRecord record)
     {
-        Add(command, record.LegalForm);
+        Add(command, CompanyDataNormalizer.NormalizeLegalForm(record.LegalForm));
         Add(command, record.RegistrationDate);
-        Add(command, record.ElectronicDeliveryAddress);
-        Add(command, record.AddressCountry);
-        Add(command, record.AddressVoivodeship);
-        Add(command, record.AddressCounty);
-        Add(command, record.AddressMunicipality);
-        Add(command, record.AddressCity);
-        Add(command, record.AddressStreet);
-        Add(command, record.AddressBuilding);
-        Add(command, record.AddressUnit);
-        Add(command, record.AddressPostalCode);
-        Add(command, record.MainPkdCode);
+        Add(command, CompanyDataNormalizer.CleanText(record.ElectronicDeliveryAddress));
+        Add(command, CompanyDataNormalizer.CleanText(record.AddressCountry)?.ToUpperInvariant());
+        Add(command, CompanyDataNormalizer.NormalizeVoivodeship(record.AddressVoivodeship));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(record.AddressCounty));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(record.AddressMunicipality));
+        Add(command, CompanyDataNormalizer.NormalizePlaceName(record.AddressCity));
+        Add(command, CompanyDataNormalizer.NormalizeStreet(record.AddressStreet));
+        Add(command, CompanyDataNormalizer.CleanText(record.AddressBuilding));
+        Add(command, CompanyDataNormalizer.CleanText(record.AddressUnit));
+        Add(command, CompanyDataNormalizer.NormalizePostalCode(record.AddressPostalCode));
+        Add(command, CompanyDataNormalizer.NormalizePkdCode(record.MainPkdCode));
         AddJson(command, record.PkdCodesJson);
     }
 
     private static string? MapSourceStatusToCanonical(string? sourceStatus) =>
-        sourceStatus?.Trim() switch
+        CompanyDataNormalizer.NormalizeStatus(sourceStatus) switch
         {
             "1" => "AKTYWNY",
             "2" => "WYKRESLONY",
+            "AKTYWNY" => "AKTYWNY",
+            "WYKRESLONY" => "WYKRESLONY",
+            "WYKREŚLONY" => "WYKRESLONY",
             _ => null
         };
 

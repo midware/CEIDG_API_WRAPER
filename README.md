@@ -71,6 +71,8 @@ dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 
 The worker is resumable. Progress is persisted in `source.import_checkpoint` after each processed company. Keep `MaxPages=0` and `MaxCompanies=0` for a full mirror.
 
+Imported CEIDG/KRS profile fields are normalized before writing to PostgreSQL: person/place/street casing, canonical voivodeship names, compact NIP/REGON/KRS/PKD values, lowercase email/website values, and comma-separated Polish phone numbers in `+48xxxxxxxxx` format. Raw registry payloads remain unchanged in `raw_detail_payload` / `raw_krs_payload` for audit and future reprocessing.
+
 Request pacing:
 
 - 50 requests / 180 seconds.
