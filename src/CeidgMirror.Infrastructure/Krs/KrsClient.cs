@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text;
 using CeidgMirror.Application.Abstractions;
 using CeidgMirror.Application.Importing;
 using CeidgMirror.Contracts;
@@ -50,7 +51,8 @@ public sealed class KrsClient(
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        var content = Encoding.UTF8.GetString(bytes);
         return new CeidgRawResponse(uri, response.StatusCode, content, DateTimeOffset.UtcNow, response.Content.Headers.ContentType?.ToString(), ReadRetryAfter(response));
     }
 

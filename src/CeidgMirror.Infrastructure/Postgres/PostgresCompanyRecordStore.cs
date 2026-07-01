@@ -517,8 +517,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14,
-                $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28::jsonb, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15,
+                $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29::jsonb, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
