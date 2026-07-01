@@ -404,13 +404,13 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         await using (var find = new NpgsqlCommand("""
             select id
             from ceidg.company_records
-            where krs_number = $1
-               or ($2 is not null and nip = $2)
-               or ($3 is not null and regon = $3)
+            where krs_number = $1::text
+               or ($2::text is not null and nip = $2::text)
+               or ($3::text is not null and regon = $3::text)
             order by case
-                when krs_number = $1 then 1
-                when $2 is not null and nip = $2 then 2
-                when $3 is not null and regon = $3 then 3
+                when krs_number = $1::text then 1
+                when $2::text is not null and nip = $2::text then 2
+                when $3::text is not null and regon = $3::text then 3
                 else 4
             end
             limit 1
