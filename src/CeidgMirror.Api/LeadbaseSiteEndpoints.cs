@@ -489,7 +489,6 @@ public static class LeadbaseSiteEndpoints
             <label><input type="checkbox" name="columns" value="postalCode"> Kod pocztowy</label>
             <label><input type="checkbox" name="columns" value="mainPkdCode" checked> Główne PKD</label>
             <label><input type="checkbox" name="columns" value="pkdCodes"> Wszystkie PKD</label>
-            <label><input type="checkbox" name="columns" value="rawDetailPayload"> Raw JSON</label>
           </fieldset>
           <button class="button button-primary button-large" type="submit">Testuj endpoint</button>
           <p class="lab-note" id="demo-counter">Demo: 2 darmowe zapytania bez konta.</p>

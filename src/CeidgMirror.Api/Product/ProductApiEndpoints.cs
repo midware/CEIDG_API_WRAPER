@@ -176,6 +176,11 @@ public static class ProductApiEndpoints
             [FromQuery] string? city,
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
+            [FromQuery] string? registrySource,
+            [FromQuery] string? krsNumber,
+            [FromQuery] string? krsLegalForm,
+            [FromQuery] string? krsStatus,
+            [FromQuery] bool? hasKrs,
             CancellationToken cancellationToken) =>
         {
             var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
@@ -194,7 +199,7 @@ public static class ProductApiEndpoints
             pageSize = pageSize <= 0 ? options.DefaultPageSize : pageSize;
             pageSize = Math.Min(pageSize, options.MaxPageSize);
 
-            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, selectedColumns);
+            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, registrySource, krsNumber, krsLegalForm, krsStatus, hasKrs, selectedColumns);
             var result = await store.SearchCompaniesAsync(user.UserId, user.ApiKeyId, query, cancellationToken);
 
             if (!result.Success)
@@ -230,6 +235,10 @@ public static class ProductApiEndpoints
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
             [FromQuery] string? pkdPrefix,
+            [FromQuery] string? registrySource,
+            [FromQuery] string? krsLegalForm,
+            [FromQuery] string? krsStatus,
+            [FromQuery] bool? hasKrs,
             [FromQuery] bool? hasEmail,
             [FromQuery] bool? hasPhone,
             [FromQuery] bool? hasWebsite,
@@ -243,13 +252,13 @@ public static class ProductApiEndpoints
                 return Results.Unauthorized();
             }
 
-            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, krsLegalForm, krsStatus, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
             var result = await analyticsStore.GetSummaryAsync(user.UserId, user.ApiKeyId, filter, cancellationToken);
             return result.Success
                 ? Results.Ok(result.Data)
                 : Results.Json(new { error = "Insufficient token balance.", requiredTokens = result.TokenCost, currentBalance = result.TokenBalanceAfter }, statusCode: StatusCodes.Status402PaymentRequired);
         })
-        .WithSummary("Aggregate CEIDG company counts without personal data");
+        .WithSummary("Aggregate company market counts");
 
         analytics.MapGet("/distribution", async (
             [FromHeader(Name = "X-Api-Key")] string? apiKey,
@@ -263,6 +272,10 @@ public static class ProductApiEndpoints
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
             [FromQuery] string? pkdPrefix,
+            [FromQuery] string? registrySource,
+            [FromQuery] string? krsLegalForm,
+            [FromQuery] string? krsStatus,
+            [FromQuery] bool? hasKrs,
             [FromQuery] bool? hasEmail,
             [FromQuery] bool? hasPhone,
             [FromQuery] bool? hasWebsite,
@@ -272,7 +285,7 @@ public static class ProductApiEndpoints
             [FromQuery] int minBucketSize,
             CancellationToken cancellationToken) =>
         {
-            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear" };
+            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear", "sourceProfile", "krsLegalForm", "krsStatus", "krsRegistrationYear" };
             if (string.IsNullOrWhiteSpace(dimension) || !allowedDimensions.Contains(dimension, StringComparer.OrdinalIgnoreCase))
             {
                 return Results.BadRequest(new { error = "Unsupported analytics dimension.", allowedDimensions });
@@ -284,13 +297,13 @@ public static class ProductApiEndpoints
                 return Results.Unauthorized();
             }
 
-            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, krsLegalForm, krsStatus, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
             var result = await analyticsStore.GetDistributionAsync(user.UserId, user.ApiKeyId, dimension, filter, limit, minBucketSize, cancellationToken);
             return result.Success
                 ? Results.Ok(result.Data)
                 : Results.Json(new { error = "Insufficient token balance.", requiredTokens = result.TokenCost, currentBalance = result.TokenBalanceAfter }, statusCode: StatusCodes.Status402PaymentRequired);
         })
-        .WithSummary("Aggregate CEIDG company distribution by selected dimension");
+        .WithSummary("Aggregate company distribution by selected dimension");
 
         return app;
     }
@@ -622,6 +635,11 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         AddTextFilter(where, parameters, "business_address_city", query.City, exact: false);
         AddTextFilter(where, parameters, "status", query.Status, exact: true);
         AddTextFilter(where, parameters, "main_pkd_code", query.MainPkdCode, exact: true);
+        AddRegistrySourceFilter(where, parameters, query.RegistrySource);
+        AddTextFilter(where, parameters, "krs_number", query.KrsNumber, exact: true);
+        AddTextFilter(where, parameters, "krs_legal_form", query.KrsLegalForm, exact: true);
+        AddTextFilter(where, parameters, "krs_status", query.KrsStatus, exact: true);
+        AddKrsPresenceFilter(where, query.HasKrs);
 
         var whereSql = where.Count == 0 ? "" : " where " + string.Join(" and ", where);
         var selectSql = string.Join(", ", query.Columns.Select(c => c.SqlExpression + " as " + c.SqlAlias));
@@ -802,11 +820,33 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         parameters.Add(new NpgsqlParameter(parameterName, exact ? value.Trim() : "%" + value.Trim() + "%"));
     }
 
+    private static void AddRegistrySourceFilter(List<string> where, List<NpgsqlParameter> parameters, string? registrySource)
+    {
+        if (string.IsNullOrWhiteSpace(registrySource))
+        {
+            return;
+        }
+
+        var parameterName = "p" + parameters.Count;
+        where.Add($"upper(@{parameterName}) = any(registry_sources)");
+        parameters.Add(new NpgsqlParameter(parameterName, registrySource.Trim().ToUpperInvariant()));
+    }
+
+    private static void AddKrsPresenceFilter(List<string> where, bool? hasKrs)
+    {
+        if (hasKrs is null)
+        {
+            return;
+        }
+
+        where.Add(hasKrs.Value ? "nullif(trim(coalesce(krs_number, '')), '') is not null" : "nullif(trim(coalesce(krs_number, '')), '') is null");
+    }
+
     private static NpgsqlParameter CloneParameter(NpgsqlParameter parameter) => new(parameter.ParameterName, parameter.Value);
 }
 
 public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance, bool EmailConfirmed);
-public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, IReadOnlyList<CompanyColumn> Columns);
+public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, string? RegistrySource, string? KrsNumber, string? KrsLegalForm, string? KrsStatus, bool? HasKrs, IReadOnlyList<CompanyColumn> Columns);
 
 public sealed record CompanySearchResult(bool Success, IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, long TotalRows, long TokenCost, long TokenBalanceAfter)
 {
@@ -835,6 +875,18 @@ public static class CompanyColumnCatalog
         new CompanyColumn("street", "business_address_street", "business_address_street", "Business street", 1),
         new CompanyColumn("postalCode", "business_address_postal_code", "business_address_postal_code", "Business postal code", 1),
         new CompanyColumn("mainPkdCode", "main_pkd_code", "main_pkd_code", "Main PKD code", 1),
+        new CompanyColumn("registrySources", "registry_sources::text", "registry_sources", "Source registries", 1),
+        new CompanyColumn("krsNumber", "krs_number", "krs_number", "KRS number", 1),
+        new CompanyColumn("krsRegisterType", "krs_register_type", "krs_register_type", "KRS register type", 1),
+        new CompanyColumn("krsLegalForm", "krs_legal_form", "krs_legal_form", "KRS legal form", 1),
+        new CompanyColumn("krsCourtName", "krs_court_name", "krs_court_name", "KRS court", 1),
+        new CompanyColumn("krsRegistrationDate", "krs_registration_date", "krs_registration_date", "KRS registration date", 1),
+        new CompanyColumn("krsLastEntryDate", "krs_last_entry_date", "krs_last_entry_date", "KRS last entry date", 1),
+        new CompanyColumn("krsStatus", "krs_status", "krs_status", "KRS source status", 1),
+        new CompanyColumn("krsName", "krs_name", "krs_name", "KRS source name", 1),
+        new CompanyColumn("krsAddress", "krs_address::text", "krs_address", "KRS address JSON", 2),
+        new CompanyColumn("krsRepresentatives", "krs_representatives::text", "krs_representatives", "KRS representatives JSON", 4),
+        new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20),
         new CompanyColumn("phone", "phone", "phone", "Phone number", 3),
         new CompanyColumn("email", "email", "email", "Email address", 3),
         new CompanyColumn("website", "website", "website", "Website", 3),

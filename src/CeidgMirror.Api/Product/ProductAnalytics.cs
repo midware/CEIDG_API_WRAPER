@@ -25,6 +25,10 @@ public sealed record AnalyticsFilter(
     string? Status,
     string? MainPkdCode,
     string? PkdPrefix,
+    string? RegistrySource,
+    string? KrsLegalForm,
+    string? KrsStatus,
+    bool? HasKrs,
     bool? HasEmail,
     bool? HasPhone,
     bool? HasWebsite,
@@ -176,7 +180,11 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         ["city"] = "business_address_city",
         ["status"] = "status",
         ["mainPkdCode"] = "main_pkd_code",
-        ["startedYear"] = "extract(year from started_on)::text"
+        ["startedYear"] = "extract(year from started_on)::text",
+        ["sourceProfile"] = "case when nullif(trim(coalesce(krs_number, '')), '') is not null and nullif(trim(coalesce(ceidg_id, '')), '') is not null then 'CEIDG+KRS' when nullif(trim(coalesce(krs_number, '')), '') is not null then 'KRS' else 'CEIDG' end",
+        ["krsLegalForm"] = "krs_legal_form",
+        ["krsStatus"] = "krs_status",
+        ["krsRegistrationYear"] = "extract(year from krs_registration_date)::text"
     };
 
     private static string BuildWhere(AnalyticsFilter filter, out List<NpgsqlParameter> parameters)
@@ -190,6 +198,10 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         AddTextFilter(where, parameters, "business_address_city", filter.City, exact: false);
         AddTextFilter(where, parameters, "status", filter.Status, exact: true);
         AddTextFilter(where, parameters, "main_pkd_code", filter.MainPkdCode, exact: true);
+        AddRegistrySourceFilter(where, parameters, filter.RegistrySource);
+        AddTextFilter(where, parameters, "krs_legal_form", filter.KrsLegalForm, exact: true);
+        AddTextFilter(where, parameters, "krs_status", filter.KrsStatus, exact: true);
+        AddKrsPresenceFilter(where, filter.HasKrs);
 
         if (!string.IsNullOrWhiteSpace(filter.PkdPrefix))
         {
@@ -229,6 +241,28 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         var parameterName = "p" + parameters.Count;
         where.Add(exact ? $"upper({column}) = upper(@{parameterName})" : $"{column} ilike @{parameterName}");
         parameters.Add(new NpgsqlParameter(parameterName, exact ? value.Trim() : "%" + value.Trim() + "%"));
+    }
+
+    private static void AddRegistrySourceFilter(List<string> where, List<NpgsqlParameter> parameters, string? registrySource)
+    {
+        if (string.IsNullOrWhiteSpace(registrySource))
+        {
+            return;
+        }
+
+        var parameterName = "p" + parameters.Count;
+        where.Add($"upper(@{parameterName}) = any(registry_sources)");
+        parameters.Add(new NpgsqlParameter(parameterName, registrySource.Trim().ToUpperInvariant()));
+    }
+
+    private static void AddKrsPresenceFilter(List<string> where, bool? hasKrs)
+    {
+        if (hasKrs is null)
+        {
+            return;
+        }
+
+        where.Add(hasKrs.Value ? "nullif(trim(coalesce(krs_number, '')), '') is not null" : "nullif(trim(coalesce(krs_number, '')), '') is null");
     }
 
     private static void AddPresenceFilter(List<string> where, string column, bool? required)

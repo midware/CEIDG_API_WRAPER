@@ -27,19 +27,36 @@ create table if not exists ceidg.company_records (
     id uuid primary key,
 
     -- Source identity and synchronization metadata
-    ceidg_id text not null unique,
+    ceidg_id text null unique,
     source_index_url text null,
-    source_detail_url text not null,
+    source_detail_url text null,
     last_index_source_hash text null,
-    last_detail_source_hash text not null,
+    last_detail_source_hash text null,
     first_seen_at_utc timestamptz not null,
     updated_at_utc timestamptz not null,
     last_import_run_id uuid null references source.import_run(id),
+    registry_sources text[] not null default array['CEIDG']::text[],
 
     -- Full source payloads. These JSONB columns are mandatory so no CEIDG field is lost
     -- when the public schema changes or contains nested collections.
     raw_index_payload jsonb null,
-    raw_detail_payload jsonb not null,
+    raw_detail_payload jsonb null,
+    raw_krs_payload jsonb null,
+
+    -- KRS scalar fields, stored in the same company profile when KRS data is available.
+    krs_number text null,
+    krs_register_type text null,
+    krs_legal_form text null,
+    krs_court_name text null,
+    krs_registration_date date null,
+    krs_last_entry_date date null,
+    krs_status text null,
+    krs_nip text null,
+    krs_regon text null,
+    krs_name text null,
+    krs_address jsonb null,
+    krs_representatives jsonb null,
+    krs_updated_at_utc timestamptz null,
 
     -- firma.* scalar fields from the documented /firma response
     nip text null,
@@ -121,6 +138,14 @@ create index if not exists ix_company_records_city on ceidg.company_records (bus
 create index if not exists ix_company_records_voivodeship on ceidg.company_records (business_address_voivodeship);
 create index if not exists ix_company_records_raw_detail_payload on ceidg.company_records using gin (raw_detail_payload);
 create index if not exists ix_company_records_pkd_codes on ceidg.company_records using gin (pkd_codes);
+create index if not exists ix_company_records_registry_sources on ceidg.company_records using gin (registry_sources);
+create index if not exists ix_company_records_krs_number on ceidg.company_records (krs_number);
+create index if not exists ix_company_records_krs_nip on ceidg.company_records (krs_nip);
+create index if not exists ix_company_records_krs_regon on ceidg.company_records (krs_regon);
+create index if not exists ix_company_records_krs_legal_form on ceidg.company_records (krs_legal_form);
+create index if not exists ix_company_records_krs_status on ceidg.company_records (krs_status);
+create index if not exists ix_company_records_krs_registration_date on ceidg.company_records (krs_registration_date);
+create index if not exists ix_company_records_raw_krs_payload on ceidg.company_records using gin (raw_krs_payload);
 
 
 create table if not exists source.report_payload (
