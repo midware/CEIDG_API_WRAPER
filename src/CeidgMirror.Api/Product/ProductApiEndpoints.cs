@@ -883,7 +883,6 @@ public static class CompanyColumnCatalog
         new CompanyColumn("krsRegistrationDate", "krs_registration_date", "krs_registration_date", "KRS registration date", 1),
         new CompanyColumn("krsLastEntryDate", "krs_last_entry_date", "krs_last_entry_date", "KRS last entry date", 1),
         new CompanyColumn("krsStatus", "krs_status", "krs_status", "KRS source status", 1),
-        new CompanyColumn("krsName", "krs_name", "krs_name", "KRS source name", 1),
         new CompanyColumn("krsAddress", "krs_address::text", "krs_address", "KRS address JSON", 2),
         new CompanyColumn("krsRepresentatives", "krs_representatives::text", "krs_representatives", "KRS representatives JSON", 4),
         new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20),

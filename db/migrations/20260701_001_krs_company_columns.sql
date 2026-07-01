@@ -16,9 +16,6 @@ alter table ceidg.company_records
     add column if not exists krs_registration_date date null,
     add column if not exists krs_last_entry_date date null,
     add column if not exists krs_status text null,
-    add column if not exists krs_nip text null,
-    add column if not exists krs_regon text null,
-    add column if not exists krs_name text null,
     add column if not exists krs_address jsonb null,
     add column if not exists krs_representatives jsonb null,
     add column if not exists raw_krs_payload jsonb null,
@@ -30,8 +27,6 @@ where registry_sources is null or cardinality(registry_sources) = 0;
 
 create index if not exists ix_company_records_registry_sources on ceidg.company_records using gin (registry_sources);
 create index if not exists ix_company_records_krs_number on ceidg.company_records (krs_number);
-create index if not exists ix_company_records_krs_nip on ceidg.company_records (krs_nip);
-create index if not exists ix_company_records_krs_regon on ceidg.company_records (krs_regon);
 create index if not exists ix_company_records_krs_legal_form on ceidg.company_records (krs_legal_form);
 create index if not exists ix_company_records_krs_status on ceidg.company_records (krs_status);
 create index if not exists ix_company_records_krs_registration_date on ceidg.company_records (krs_registration_date);

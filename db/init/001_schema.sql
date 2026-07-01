@@ -38,9 +38,6 @@ create table if not exists ceidg.company_records (
     krs_registration_date date null,
     krs_last_entry_date date null,
     krs_status text null,
-    krs_nip text null,
-    krs_regon text null,
-    krs_name text null,
     krs_address jsonb null,
     krs_representatives jsonb null,
     krs_updated_at_utc timestamptz null,
@@ -127,8 +124,6 @@ create index if not exists ix_company_records_raw_detail_payload on ceidg.compan
 create index if not exists ix_company_records_pkd_codes on ceidg.company_records using gin (pkd_codes);
 create index if not exists ix_company_records_registry_sources on ceidg.company_records using gin (registry_sources);
 create index if not exists ix_company_records_krs_number on ceidg.company_records (krs_number);
-create index if not exists ix_company_records_krs_nip on ceidg.company_records (krs_nip);
-create index if not exists ix_company_records_krs_regon on ceidg.company_records (krs_regon);
 create index if not exists ix_company_records_krs_legal_form on ceidg.company_records (krs_legal_form);
 create index if not exists ix_company_records_krs_status on ceidg.company_records (krs_status);
 create index if not exists ix_company_records_krs_registration_date on ceidg.company_records (krs_registration_date);

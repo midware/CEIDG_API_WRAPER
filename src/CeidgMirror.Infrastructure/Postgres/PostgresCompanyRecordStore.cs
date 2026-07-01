@@ -394,8 +394,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             select id
             from ceidg.company_records
             where krs_number = $1
-               or ($2 is not null and (nip = $2 or krs_nip = $2))
-               or ($3 is not null and (regon = $3 or krs_regon = $3))
+               or ($2 is not null and nip = $2)
+               or ($3 is not null and regon = $3)
             order by case
                 when krs_number = $1 then 1
                 when $2 is not null and nip = $2 then 2
@@ -431,19 +431,16 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                     krs_registration_date = $6,
                     krs_last_entry_date = $7,
                     krs_status = $8,
-                    krs_nip = $9,
-                    krs_regon = $10,
-                    krs_name = $11,
-                    krs_address = $12::jsonb,
-                    krs_representatives = $13::jsonb,
-                    raw_krs_payload = $14::jsonb,
-                    krs_updated_at_utc = $15,
-                    source_detail_url = coalesce(source_detail_url, $16),
-                    last_detail_source_hash = coalesce(last_detail_source_hash, $17),
-                    last_import_run_id = $18,
-                    nip = coalesce(nullif(nip, ''), $9),
-                    regon = coalesce(nullif(regon, ''), $10),
-                    name = coalesce(nullif(name, ''), $11),
+                    krs_address = $9::jsonb,
+                    krs_representatives = $10::jsonb,
+                    raw_krs_payload = $11::jsonb,
+                    krs_updated_at_utc = $12,
+                    source_detail_url = coalesce(source_detail_url, $13),
+                    last_detail_source_hash = coalesce(last_detail_source_hash, $14),
+                    last_import_run_id = $15,
+                    nip = coalesce(nullif(nip, ''), $16),
+                    regon = coalesce(nullif(regon, ''), $17),
+                    name = coalesce(nullif(name, ''), $18),
                     updated_at_utc = now()
                 where id = $1
                 """, connection, transaction);
@@ -479,9 +476,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 krs_registration_date,
                 krs_last_entry_date,
                 krs_status,
-                krs_nip,
-                krs_regon,
-                krs_name,
                 krs_address,
                 krs_representatives,
                 krs_updated_at_utc,
@@ -490,7 +484,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17::jsonb, $18, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
@@ -509,9 +503,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(insert, record.RegistrationDate);
             Add(insert, record.LastEntryDate);
             Add(insert, record.Status);
-            Add(insert, record.Nip);
-            Add(insert, record.Regon);
-            Add(insert, record.Name);
             AddJson(insert, record.AddressJson);
             AddJson(insert, record.RepresentativesJson);
             Add(insert, record.FetchedAtUtc);
@@ -530,9 +521,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.RegistrationDate);
         Add(command, record.LastEntryDate);
         Add(command, record.Status);
-        Add(command, record.Nip);
-        Add(command, record.Regon);
-        Add(command, record.Name);
         AddJson(command, record.AddressJson);
         AddJson(command, record.RepresentativesJson);
         AddJson(command, record.RawJson);
@@ -540,6 +528,9 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.SourceUri.ToString());
         Add(command, Sha256(record.RawJson));
         Add(command, importRunId);
+        Add(command, record.Nip);
+        Add(command, record.Regon);
+        Add(command, record.Name);
     }
 
     public async Task UpsertReportPayloadAsync(

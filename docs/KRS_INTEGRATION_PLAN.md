@@ -1,4 +1,4 @@
-# Plan integracji KRS z leadbase.network
+﻿# Plan integracji KRS z leadbase.network
 
 Cel: zaciagac dane KRS do tej samej bazy i tego samego modelu firm, ktory dzis obsluguje CEIDG. Nie tworzymy osobnej bazy ani rownoleglego zestawu tabel firmowych. KRS ma uzupelniac i rozszerzac rekord firmy.
 
@@ -16,9 +16,6 @@ Nowe dane KRS dokladamy jako kolumny w tej samej tabeli:
 - `krs_registration_date date null`.
 - `krs_last_entry_date date null`.
 - `krs_status text null`.
-- `krs_nip text null`.
-- `krs_regon text null`.
-- `krs_name text null`.
 - `krs_address jsonb null`.
 - `krs_representatives jsonb null`.
 - `krs_beneficiaries jsonb null` tylko jesli API KRS/API powiazane legalnie to udostepnia i potwierdzimy zakres.
@@ -28,19 +25,19 @@ Nowe dane KRS dokladamy jako kolumny w tej samej tabeli:
 Nie nadpisujemy bezrefleksyjnie CEIDG danymi KRS. Pola wspolne mapujemy wedlug priorytetow:
 
 - `nip`, `regon` jako klucze laczenia i wyszukiwania.
-- `name` moze pozostac nazwa operacyjna z CEIDG, a `krs_name` przechowuje nazwe z KRS.
+- `nip`, `regon` i `name` sa kanonicznymi polami podmiotu, niezaleznie od zrodla CEIDG/KRS. Nie duplikujemy ich jako `krs_nip`, `krs_regon`, `krs_name`.
 - `status` pozostaje ujednoliconym statusem produktu, a `krs_status` przechowuje status zrodlowy.
 
 ## Laczenie rekordow
 
 Priorytet dopasowania:
 
-1. `nip` zgodny z `krs_nip`.
-2. `regon` zgodny z `krs_regon`.
-3. `krs_number` gdy rekord juz istnieje z poprzedniego importu KRS.
+1. `krs_number` gdy rekord juz istnieje z poprzedniego importu KRS.
+2. `nip` zgodny z kanonicznym `nip`.
+3. `regon` zgodny z kanonicznym `regon`.
 4. Dopasowanie po nazwie tylko jako kandydat do audytu, nie jako automatyczny merge.
 
-Jesli KRS zwroci podmiot bez NIP/REGON, tworzymy rekord w tej samej tabeli z `krs_number`, `krs_name`, `registry_sources = ARRAY['KRS']` i pustymi polami CEIDG.
+Jesli KRS zwroci podmiot bez NIP/REGON, tworzymy rekord w tej samej tabeli z `krs_number`, kanonicznym `name`, `registry_sources = ARRAY['KRS']` i pustymi polami CEIDG.
 
 ## Worker KRS
 
@@ -99,17 +96,12 @@ alter table ceidg.company_records
     add column if not exists krs_registration_date date null,
     add column if not exists krs_last_entry_date date null,
     add column if not exists krs_status text null,
-    add column if not exists krs_nip text null,
-    add column if not exists krs_regon text null,
-    add column if not exists krs_name text null,
     add column if not exists krs_address jsonb null,
     add column if not exists krs_representatives jsonb null,
     add column if not exists raw_krs_payload jsonb null,
     add column if not exists krs_updated_at_utc timestamptz null;
 
 create index if not exists ix_company_records_krs_number on ceidg.company_records(krs_number);
-create index if not exists ix_company_records_krs_nip on ceidg.company_records(krs_nip);
-create index if not exists ix_company_records_krs_regon on ceidg.company_records(krs_regon);
 create index if not exists ix_company_records_registry_sources on ceidg.company_records using gin(registry_sources);
 create index if not exists ix_company_records_krs_legal_form on ceidg.company_records(krs_legal_form);
 ```
