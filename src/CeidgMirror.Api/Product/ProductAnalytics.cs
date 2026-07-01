@@ -181,10 +181,10 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         ["status"] = "status",
         ["mainPkdCode"] = "main_pkd_code",
         ["startedYear"] = "extract(year from started_on)::text",
+        ["registeredYear"] = "extract(year from registered_on)::text",
         ["sourceProfile"] = "case when nullif(trim(coalesce(krs_number, '')), '') is not null and nullif(trim(coalesce(ceidg_id, '')), '') is not null then 'CEIDG+KRS' when nullif(trim(coalesce(krs_number, '')), '') is not null then 'KRS' else 'CEIDG' end",
         ["krsLegalForm"] = "krs_legal_form",
-        ["krsStatus"] = "krs_status",
-        ["krsRegistrationYear"] = "extract(year from krs_registration_date)::text"
+        ["krsStatus"] = "krs_status"
     };
 
     private static string BuildWhere(AnalyticsFilter filter, out List<NpgsqlParameter> parameters)

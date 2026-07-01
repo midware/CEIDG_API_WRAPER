@@ -428,33 +428,32 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                     krs_register_type = $3,
                     krs_legal_form = $4,
                     krs_court_name = $5,
-                    krs_registration_date = $6,
-                    krs_last_entry_date = $7,
-                    krs_status = $8,
-                    krs_address = $9::jsonb,
-                    krs_representatives = $10::jsonb,
-                    raw_krs_payload = $11::jsonb,
-                    krs_updated_at_utc = $12,
-                    source_detail_url = coalesce(source_detail_url, $13),
-                    last_detail_source_hash = coalesce(last_detail_source_hash, $14),
-                    last_import_run_id = $15,
-                    nip = coalesce(nullif(nip, ''), $16),
-                    regon = coalesce(nullif(regon, ''), $17),
-                    name = coalesce(nullif(name, ''), $18),
-                    status = coalesce(nullif(status, ''), $19),
-                    legal_form = coalesce($20, legal_form),
-                    registered_on = coalesce($21, registered_on),
-                    business_address_country = coalesce($22, nullif(business_address_country, '')),
-                    business_address_voivodeship = coalesce($23, nullif(business_address_voivodeship, '')),
-                    business_address_county = coalesce($24, nullif(business_address_county, '')),
-                    business_address_municipality = coalesce($25, nullif(business_address_municipality, '')),
-                    business_address_city = coalesce($26, nullif(business_address_city, '')),
-                    business_address_street = coalesce($27, nullif(business_address_street, '')),
-                    business_address_building = coalesce($28, nullif(business_address_building, '')),
-                    business_address_unit = coalesce($29, nullif(business_address_unit, '')),
-                    business_address_postal_code = coalesce($30, nullif(business_address_postal_code, '')),
-                    main_pkd_code = coalesce($31, nullif(main_pkd_code, '')),
-                    pkd_codes = coalesce($32::jsonb, pkd_codes),
+                    krs_last_entry_date = $6,
+                    krs_status = $7,
+                    krs_address = $8::jsonb,
+                    krs_representatives = $9::jsonb,
+                    raw_krs_payload = $10::jsonb,
+                    krs_updated_at_utc = $11,
+                    source_detail_url = coalesce(source_detail_url, $12),
+                    last_detail_source_hash = coalesce(last_detail_source_hash, $13),
+                    last_import_run_id = $14,
+                    nip = coalesce(nullif(nip, ''), $15),
+                    regon = coalesce(nullif(regon, ''), $16),
+                    name = coalesce(nullif(name, ''), $17),
+                    status = coalesce(nullif(status, ''), $18),
+                    legal_form = coalesce($19, legal_form),
+                    registered_on = coalesce($20, registered_on),
+                    business_address_country = coalesce($21, nullif(business_address_country, '')),
+                    business_address_voivodeship = coalesce($22, nullif(business_address_voivodeship, '')),
+                    business_address_county = coalesce($23, nullif(business_address_county, '')),
+                    business_address_municipality = coalesce($24, nullif(business_address_municipality, '')),
+                    business_address_city = coalesce($25, nullif(business_address_city, '')),
+                    business_address_street = coalesce($26, nullif(business_address_street, '')),
+                    business_address_building = coalesce($27, nullif(business_address_building, '')),
+                    business_address_unit = coalesce($28, nullif(business_address_unit, '')),
+                    business_address_postal_code = coalesce($29, nullif(business_address_postal_code, '')),
+                    main_pkd_code = coalesce($30, nullif(main_pkd_code, '')),
+                    pkd_codes = coalesce($31::jsonb, pkd_codes),
                     updated_at_utc = now()
                 where id = $1
                 """, connection, transaction);
@@ -488,7 +487,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 krs_register_type,
                 krs_legal_form,
                 krs_court_name,
-                krs_registration_date,
                 krs_last_entry_date,
                 krs_status,
                 krs_address,
@@ -512,8 +510,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19,
-                $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32::jsonb, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17,
+                $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
@@ -530,7 +528,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(insert, record.RegisterType);
             Add(insert, record.LegalForm);
             Add(insert, record.CourtName);
-            Add(insert, record.RegistrationDate);
             Add(insert, record.LastEntryDate);
             Add(insert, record.Status);
             AddJson(insert, record.AddressJson);
@@ -549,7 +546,6 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.RegisterType);
         Add(command, record.LegalForm);
         Add(command, record.CourtName);
-        Add(command, record.RegistrationDate);
         Add(command, record.LastEntryDate);
         Add(command, record.Status);
         AddJson(command, record.AddressJson);

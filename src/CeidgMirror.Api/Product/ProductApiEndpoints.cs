@@ -285,7 +285,7 @@ public static class ProductApiEndpoints
             [FromQuery] int minBucketSize,
             CancellationToken cancellationToken) =>
         {
-            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear", "sourceProfile", "krsLegalForm", "krsStatus", "krsRegistrationYear" };
+            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear", "registeredYear", "sourceProfile", "krsLegalForm", "krsStatus" };
             if (string.IsNullOrWhiteSpace(dimension) || !allowedDimensions.Contains(dimension, StringComparer.OrdinalIgnoreCase))
             {
                 return Results.BadRequest(new { error = "Unsupported analytics dimension.", allowedDimensions });
@@ -882,7 +882,6 @@ public static class CompanyColumnCatalog
         new CompanyColumn("krsRegisterType", "krs_register_type", "krs_register_type", "KRS register type", 1),
         new CompanyColumn("krsLegalForm", "krs_legal_form", "krs_legal_form", "KRS legal form", 1),
         new CompanyColumn("krsCourtName", "krs_court_name", "krs_court_name", "KRS court", 1),
-        new CompanyColumn("krsRegistrationDate", "krs_registration_date", "krs_registration_date", "KRS registration date", 1),
         new CompanyColumn("krsLastEntryDate", "krs_last_entry_date", "krs_last_entry_date", "KRS last entry date", 1),
         new CompanyColumn("krsStatus", "krs_status", "krs_status", "KRS source status", 1),
         new CompanyColumn("krsAddress", "krs_address::text", "krs_address", "KRS address JSON", 2),

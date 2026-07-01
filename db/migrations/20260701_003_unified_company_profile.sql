@@ -11,7 +11,7 @@ set legal_form = coalesce(
         nullif(krs_legal_form, ''),
         case when registry_sources @> array['CEIDG']::text[] then 'JEDNOOSOBOWA DZIAŁALNOŚĆ GOSPODARCZA' end
     ),
-    registered_on = coalesce(registered_on, krs_registration_date, started_on)
+    registered_on = coalesce(registered_on, started_on)
 where legal_form is null
    or legal_form = ''
    or legal_form = 'JEDNOOSOBOWA DZIALALNOSC GOSPODARCZA'
