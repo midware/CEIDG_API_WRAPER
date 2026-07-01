@@ -948,6 +948,11 @@ ul { padding-left: 18px; }
   font-weight: 800;
   overflow-wrap: anywhere;
 }
+.import-card .muted-dd {
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
+}
 
 .panel-footnote {
   margin: 0;

@@ -299,6 +299,26 @@ public static class LeadbaseSiteEndpoints
 
 
 
+    private static string RenderSkippedBreakdown(ImportSourceMetrics source)
+    {
+        var rows = new List<string>();
+        if (source.SkippedBreakdown.ExistingCompanies > 0)
+        {
+            rows.Add($"<dt>Już w bazie</dt><dd>{source.SkippedBreakdown.ExistingCompanies:N0}</dd>");
+        }
+
+        if (source.SkippedBreakdown.NotFoundInRegister > 0)
+        {
+            rows.Add($"<dt>Brak w rejestrze</dt><dd>{source.SkippedBreakdown.NotFoundInRegister:N0}</dd>");
+        }
+
+        if (source.SkippedBreakdown.Other > 0)
+        {
+            rows.Add($"<dt>Inne pominięcia</dt><dd>{source.SkippedBreakdown.Other:N0}</dd>");
+        }
+
+        return rows.Count == 0 ? string.Empty : string.Concat(rows) + $"<dt>Wyjaśnienie</dt><dd class=\"muted-dd\">{Html(source.SkippedBreakdown.Explanation)}</dd>";
+    }
     private static string RenderDataQuality(DataQualityReportResponse quality)
     {
         var qualityCards = new[]
@@ -341,7 +361,8 @@ public static class LeadbaseSiteEndpoints
                 <dt>Ostatni sukces</dt><dd>{FormatDate(source.LastCompletedRunFinishedAtUtc)}</dd>
                 <dt>Ostatni checkpoint</dt><dd>{FormatDate(source.LastCheckpointAtUtc)}</dd>
                 <dt>Zaimportowane</dt><dd>{source.ImportedFromCheckpoints:N0}</dd>
-                <dt>Pominięte</dt><dd>{source.SkippedFromCheckpoints:N0}</dd>
+                <dt>Kontrolnie pominięte</dt><dd>{source.SkippedFromCheckpoints:N0}</dd>
+                {RenderSkippedBreakdown(source)}
                 <dt>Błędy 24h</dt><dd>{source.FailedRuns24h:N0}</dd>
                 <dt>Rekordy/min</dt><dd>{FormatDecimal(source.LastRunRecordsPerMinute)}</dd>
               </dl>

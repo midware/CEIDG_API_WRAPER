@@ -10,6 +10,8 @@ public sealed record ContactQuality(long MissingPhoneRows, long InvalidPhoneRows
 public sealed record DuplicateQuality(long DuplicateNipGroups, long DuplicateNipRows, long DuplicateRegonGroups, long DuplicateRegonRows, long DuplicateKrsGroups, long DuplicateKrsRows);
 public sealed record DataQualityReportResponse(DateTimeOffset GeneratedAtUtc, long TotalCompanies, IdentityQuality Identity, AddressQuality Address, ContactQuality Contact, DuplicateQuality Duplicates);
 
+public sealed record ImportSkippedBreakdown(long ExistingCompanies, long NotFoundInRegister, long Other, string Explanation);
+
 public sealed record ImportSourceMetrics(
     string ImportKind,
     DateTimeOffset? LastRunStartedAtUtc,
@@ -22,6 +24,7 @@ public sealed record ImportSourceMetrics(
     long FailedRuns24h,
     long ImportedFromCheckpoints,
     long SkippedFromCheckpoints,
+    ImportSkippedBreakdown SkippedBreakdown,
     long FailedFromCheckpoints,
     long? LastRunImported,
     long? LastRunSkipped,
@@ -220,6 +223,7 @@ public sealed class ProductOperationsStore(NpgsqlDataSource dataSource)
             failedRuns24h,
             imported,
             skipped,
+            BuildSkippedBreakdown(importKind, skipped),
             failed,
             details?.Imported,
             details?.Skipped,
@@ -229,6 +233,21 @@ public sealed class ProductOperationsStore(NpgsqlDataSource dataSource)
             hasIncompleteCheckpoint);
     }
 
+    private static ImportSkippedBreakdown BuildSkippedBreakdown(string importKind, long skipped)
+    {
+        if (string.Equals(importKind, "changes-detail", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(importKind, "initial-index-detail", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ImportSkippedBreakdown(skipped, 0, 0, "CEIDG: rekord był już w bazie i SkipExistingCompanies=true, więc nie pobierano szczegółów ponownie.");
+        }
+
+        if (string.Equals(importKind, "krs-current-excerpt", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ImportSkippedBreakdown(0, skipped, 0, "KRS: numer wystąpił w biuletynie, ale aktualny odpis nie istnieje w skonfigurowanym rejestrze.");
+        }
+
+        return new ImportSkippedBreakdown(0, 0, skipped, "Kontrolowane pominięcia bez szczegółowego powodu dla tego typu importu.");
+    }
     private static ImportRunDetails ParseDetails(string json)
     {
         using var document = JsonDocument.Parse(json);
