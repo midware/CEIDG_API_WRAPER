@@ -4,6 +4,7 @@ using System.Text;
 using CeidgMirror.Application.Abstractions;
 using CeidgMirror.Application.Importing;
 using CeidgMirror.Contracts;
+using CeidgMirror.Infrastructure.Ceidg;
 using Microsoft.Extensions.Logging;
 
 namespace CeidgMirror.Infrastructure.Importing;
@@ -131,6 +132,7 @@ public sealed class CeidgInitialImportService(
                     if (!changesResponse.IsSuccess)
                     {
                         lastFailure = $"CEIDG /zmiana failed with status {(int)changesResponse.StatusCode} for {windowFrom}..{windowTo} page {page}. Body: {Truncate(changesResponse.Content, 500)}";
+                        ThrowIfRateLimited(changesResponse, lastFailure);
                         logger.LogError("{Failure}", lastFailure);
                         throw new InvalidOperationException(lastFailure);
                     }
@@ -220,9 +222,10 @@ public sealed class CeidgInitialImportService(
                             }
                             else if (!detailResponse.IsSuccess)
                             {
+                                lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for id {companyId}. Body: {Truncate(detailResponse.Content, 500)}";
+                                ThrowIfRateLimited(detailResponse, lastFailure);
                                 failedThisRun++;
                                 failedTotal++;
-                                lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for id {companyId}. Body: {Truncate(detailResponse.Content, 500)}";
                                 logger.LogWarning("{Failure}", lastFailure);
                             }
                             else
@@ -237,6 +240,10 @@ public sealed class CeidgInitialImportService(
                                     importedThisRun,
                                     importedTotal);
                             }
+                        }
+                        catch (CeidgRateLimitExceededException)
+                        {
+                            throw;
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
@@ -398,6 +405,7 @@ public sealed class CeidgInitialImportService(
             if (!catalogResponse.IsSuccess)
             {
                 lastFailure = $"CEIDG report catalog failed with status {(int)catalogResponse.StatusCode}. Body: {Truncate(catalogResponse.Content, 500)}";
+                ThrowIfRateLimited(catalogResponse, lastFailure);
                 logger.LogError("{Failure}", lastFailure);
                 throw new InvalidOperationException(lastFailure);
             }
@@ -424,8 +432,9 @@ public sealed class CeidgInitialImportService(
                     var payloadResponse = await ceidgClient.DownloadReportFromRepositoryAsync(report.GeneratedReportId, cancellationToken: cancellationToken);
                     if (!payloadResponse.IsSuccess)
                     {
-                        failed++;
                         lastFailure = $"CEIDG report download failed with status {(int)payloadResponse.StatusCode} for generatedReportId {report.GeneratedReportId}. Body: {Truncate(payloadResponse.Content, 500)}";
+                        ThrowIfRateLimited(payloadResponse, lastFailure);
+                        failed++;
                         logger.LogWarning("{Failure}", lastFailure);
                         continue;
                     }
@@ -438,6 +447,10 @@ public sealed class CeidgInitialImportService(
                         report.FileType,
                         report.GeneratedOn,
                         payloadResponse.Content.Length);
+                }
+                catch (CeidgRateLimitExceededException)
+                {
+                    throw;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -503,6 +516,7 @@ public sealed class CeidgInitialImportService(
                 if (!indexResponse.IsSuccess)
                 {
                     lastFailure = $"CEIDG /firmy failed with status {(int)indexResponse.StatusCode} on page {page}. Body: {Truncate(indexResponse.Content, 500)}";
+                    ThrowIfRateLimited(indexResponse, lastFailure);
                     logger.LogError("{Failure}", lastFailure);
                     throw new InvalidOperationException(lastFailure);
                 }
@@ -537,14 +551,19 @@ public sealed class CeidgInitialImportService(
 
                         if (!detailResponse.IsSuccess)
                         {
-                            failed++;
                             lastFailure = $"CEIDG detail failed with status {(int)detailResponse.StatusCode} for CEIDG id {item.CeidgId}, NIP {item.Nip}, REGON {item.Regon}. Body: {Truncate(detailResponse.Content, 500)}";
+                            ThrowIfRateLimited(detailResponse, lastFailure);
+                            failed++;
                             logger.LogWarning("{Failure}", lastFailure);
                             continue;
                         }
 
                         await store.UpsertCompanyAsync(item, detailResponse, importRunId, cancellationToken);
                         imported++;
+                    }
+                    catch (CeidgRateLimitExceededException)
+                    {
+                        throw;
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
@@ -637,6 +656,22 @@ public sealed class CeidgInitialImportService(
     }
 
     private DateOnly EffectiveFinalDate() => options.ChangesTo ?? DateOnly.FromDateTime(DateTime.UtcNow);
+    private static void ThrowIfRateLimited(CeidgRawResponse response, string failure)
+    {
+        if (response.StatusCode != HttpStatusCode.TooManyRequests)
+        {
+            return;
+        }
+
+        var retryAfter = response.RetryAfter ?? TimeSpan.FromMinutes(61);
+        if (retryAfter < TimeSpan.FromMinutes(1))
+        {
+            retryAfter = TimeSpan.FromMinutes(1);
+        }
+
+        throw new CeidgRateLimitExceededException(failure, retryAfter);
+    }
+
 
     private static void EnsureJsonResponse(CeidgRawResponse response, string operationName)
     {

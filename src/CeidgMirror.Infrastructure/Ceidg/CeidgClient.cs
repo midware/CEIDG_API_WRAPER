@@ -104,7 +104,7 @@ public sealed partial class CeidgClient(
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return new CeidgRawResponse(uri, response.StatusCode, content, DateTimeOffset.UtcNow, response.Content.Headers.ContentType?.ToString());
+        return new CeidgRawResponse(uri, response.StatusCode, content, DateTimeOffset.UtcNow, response.Content.Headers.ContentType?.ToString(), ReadRetryAfter(response));
     }
 
     private async Task<CeidgRawResponse> SendReportRepositoryAsync(
@@ -123,7 +123,24 @@ public sealed partial class CeidgClient(
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return new CeidgRawResponse(uri, response.StatusCode, content, DateTimeOffset.UtcNow, response.Content.Headers.ContentType?.ToString());
+        return new CeidgRawResponse(uri, response.StatusCode, content, DateTimeOffset.UtcNow, response.Content.Headers.ContentType?.ToString(), ReadRetryAfter(response));
+    }
+
+    private static TimeSpan? ReadRetryAfter(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter?.Delta is not null)
+        {
+            return retryAfter.Delta;
+        }
+
+        if (retryAfter?.Date is not null)
+        {
+            var delay = retryAfter.Date.Value - DateTimeOffset.UtcNow;
+            return delay > TimeSpan.Zero ? delay : TimeSpan.Zero;
+        }
+
+        return null;
     }
 
     private async Task<string> GetReportRepositoryTokenAsync(CancellationToken cancellationToken)

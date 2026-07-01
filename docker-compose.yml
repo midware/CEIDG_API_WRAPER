@@ -34,7 +34,7 @@ services:
       CeidgApi__JwtToken: ${CEIDG_JWT_TOKEN:-}
       CeidgApi__RequestLimit: 50
       CeidgApi__WindowSeconds: 180
-      CeidgApi__HourlyRequestLimit: 1000
+      CeidgApi__HourlyRequestLimit: ${CEIDG_API_HOURLY_REQUEST_LIMIT:-900}
       CeidgApi__HourlyWindowSeconds: 3600
       CeidgApi__MinimumRequestIntervalSeconds: 4
       CeidgApi__RequestTimeoutSeconds: 300

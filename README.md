@@ -80,8 +80,9 @@ Imported CEIDG/KRS profile fields are normalized before writing to PostgreSQL: p
 Request pacing:
 
 - 50 requests / 180 seconds.
-- 1000 requests / 3600 seconds.
+- 900 requests / 3600 seconds by default, leaving a safety buffer below the CEIDG hard limit of 1000 / 60 minutes.
 - Smooth interval: `CeidgApi__MinimumRequestIntervalSeconds=4`.
+- CEIDG `429 Too Many Requests` is treated as a source-level throttle: the worker keeps the saved checkpoint and waits for `Retry-After` plus a small buffer, or 61 minutes when the API does not send `Retry-After`. KRS continues in its own loop.
 
 ## KRS Import
 

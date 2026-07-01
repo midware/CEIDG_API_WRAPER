@@ -109,6 +109,16 @@ public class Worker(
             {
                 throw;
             }
+            catch (CeidgRateLimitExceededException ex)
+            {
+                var retryDelay = ex.RetryAfter + TimeSpan.FromMinutes(2);
+                logger.LogWarning(
+                    ex,
+                    "{ImportName} import reached CEIDG rate limit. It will retry from the saved checkpoint in {DelayMinutes:n1} minutes.",
+                    importName,
+                    retryDelay.TotalMinutes);
+                await Task.Delay(retryDelay, stoppingToken);
+            }
             catch (Exception ex)
             {
                 logger.LogError(
