@@ -23,18 +23,31 @@ public sealed class CompanyDataNormalizerTests
         Assert.Equal(expected, CompanyDataNormalizer.NormalizePlaceName(input));
     }
 
-    [Fact]
-    public void NormalizeStreet_KeepsCommonPrefixLowercaseAndRomanNumeralsUppercase()
+    [Theory]
+    [InlineData("UL. JANA PAWŁA II", "Jana Pawła II")]
+    [InlineData("ulica Lipowa", "Lipowa")]
+    [InlineData("Aleje Jerozolimskie", "Aleje Jerozolimskie")]
+    public void NormalizeStreet_RemovesOnlyStreetPrefixAndKeepsNamesReadable(string input, string expected)
     {
-        Assert.Equal("ul. Jana Pawła II", CompanyDataNormalizer.NormalizeStreet("UL. JANA PAWŁA II"));
+        Assert.Equal(expected, CompanyDataNormalizer.NormalizeStreet(input));
+    }
+
+    [Theory]
+    [InlineData("PL", "PL")]
+    [InlineData("Polska", "PL")]
+    [InlineData("POLSKA", "PL")]
+    public void NormalizeCountryCode_ReturnsIso2Code(string input, string expected)
+    {
+        Assert.Equal(expected, CompanyDataNormalizer.NormalizeCountryCode(input));
     }
 
     [Theory]
     [InlineData("506 931 814", "+48506931814")]
     [InlineData("+48604129396, 730744300, 881661141", "+48604129396, +48730744300, +48881661141")]
     [InlineData("501222333 502333444", "+48501222333, +48502333444")]
-    [InlineData("+48 34 3256023", "+48343256023")]
-    public void NormalizePhoneList_ReturnsCommaSeparatedE164PolishNumbers(string input, string expected)
+    [InlineData("+48 34 3256023", "+48 34 325 60 23")]
+    [InlineData("184777702", "+48 18 477 77 02")]
+    public void NormalizePhoneList_FormatsMobileAndLandlinePolishNumbers(string input, string expected)
     {
         Assert.Equal(expected, CompanyDataNormalizer.NormalizePhoneList(input));
     }

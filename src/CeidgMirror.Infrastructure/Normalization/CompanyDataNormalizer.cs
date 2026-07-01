@@ -8,6 +8,11 @@ public static partial class CompanyDataNormalizer
 {
     private static readonly CultureInfo PolishCulture = CultureInfo.GetCultureInfo("pl-PL");
 
+    private static readonly HashSet<string> PolishMobilePrefixes = new(StringComparer.Ordinal)
+    {
+        "45", "50", "51", "53", "57", "60", "66", "69", "72", "73", "78", "79", "88"
+    };
+
     private static readonly IReadOnlyDictionary<string, string> Voivodeships = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["DOLNOSLASKIE"] = "Dolnośląskie",
@@ -51,7 +56,25 @@ public static partial class CompanyDataNormalizer
             return null;
         }
 
-        return StreetPrefixRegex().Replace(normalized, match => match.Value.ToLower(PolishCulture));
+        var withoutStreetPrefix = StreetPrefixRegex().Replace(normalized, string.Empty).Trim();
+        return withoutStreetPrefix.Length == 0 ? null : withoutStreetPrefix;
+    }
+
+    public static string? NormalizeCountryCode(string? value)
+    {
+        var cleaned = CleanText(value);
+        if (cleaned is null)
+        {
+            return null;
+        }
+
+        var key = RemoveDiacritics(cleaned).ToUpperInvariant();
+        return key switch
+        {
+            "PL" or "POLSKA" or "RP" or "RZECZPOSPOLITA POLSKA" => "PL",
+            _ when key.Length == 2 => key,
+            _ => key
+        };
     }
 
     public static string? NormalizeVoivodeship(string? value)
@@ -216,13 +239,13 @@ public static partial class CompanyDataNormalizer
 
         if (digits.Length == 9)
         {
-            phones.Add("+48" + digits);
+            phones.Add(FormatPolishPhone(digits));
             return;
         }
 
         if (digits.Length == 11 && digits.StartsWith("48", StringComparison.Ordinal))
         {
-            phones.Add("+" + digits);
+            phones.Add(FormatPolishPhone(digits[2..]));
             return;
         }
 
@@ -248,9 +271,17 @@ public static partial class CompanyDataNormalizer
     {
         for (var index = 0; index + 9 <= digits.Length; index += 9)
         {
-            phones.Add("+48" + digits.Substring(index, 9));
+            phones.Add(FormatPolishPhone(digits.Substring(index, 9)));
         }
     }
+
+    private static string FormatPolishPhone(string nineDigits) =>
+        IsPolishMobile(nineDigits)
+            ? "+48" + nineDigits
+            : $"+48 {nineDigits[..2]} {nineDigits.Substring(2, 3)} {nineDigits.Substring(5, 2)} {nineDigits.Substring(7, 2)}";
+
+    private static bool IsPolishMobile(string nineDigits) =>
+        nineDigits.Length == 9 && PolishMobilePrefixes.Contains(nineDigits[..2]);
 
     private static string RemoveDiacritics(string value)
     {
@@ -276,7 +307,7 @@ public static partial class CompanyDataNormalizer
     [GeneratedRegex(@"[,;|/]+")]
     private static partial Regex PhoneSeparatorRegex();
 
-    [GeneratedRegex(@"^(Ul|Al|Pl|Os|Bulw|Rondo)\.", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(ul\.|ulica\s+)", RegexOptions.IgnoreCase)]
     private static partial Regex StreetPrefixRegex();
 
     [GeneratedRegex(@"\b[IVXLCDM]{2,}\b", RegexOptions.IgnoreCase)]

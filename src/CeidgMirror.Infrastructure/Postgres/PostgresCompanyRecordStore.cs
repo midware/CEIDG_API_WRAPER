@@ -349,7 +349,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, ReadBool(owner, "nipUchylony"));
         Add(command, ReadBool(owner, "nipUniewazniony"));
         Add(command, CompanyDataNormalizer.NormalizeDigits(ReadString(owner, "regon")));
-        Add(command, CompanyDataNormalizer.CleanText(ReadString(address, "kraj"))?.ToUpperInvariant());
+        Add(command, CompanyDataNormalizer.NormalizeCountryCode(ReadString(address, "kraj")));
         Add(command, CompanyDataNormalizer.NormalizeVoivodeship(ReadString(address, "wojewodztwo")));
         Add(command, CompanyDataNormalizer.NormalizePlaceName(ReadString(address, "powiat")));
         Add(command, CompanyDataNormalizer.NormalizePlaceName(ReadString(address, "gmina")));
@@ -558,7 +558,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, CompanyDataNormalizer.NormalizeLegalForm(record.LegalForm));
         Add(command, record.RegistrationDate);
         Add(command, CompanyDataNormalizer.CleanText(record.ElectronicDeliveryAddress));
-        Add(command, CompanyDataNormalizer.CleanText(record.AddressCountry)?.ToUpperInvariant());
+        Add(command, CompanyDataNormalizer.NormalizeCountryCode(record.AddressCountry));
         Add(command, CompanyDataNormalizer.NormalizeVoivodeship(record.AddressVoivodeship));
         Add(command, CompanyDataNormalizer.NormalizePlaceName(record.AddressCounty));
         Add(command, CompanyDataNormalizer.NormalizePlaceName(record.AddressMunicipality));
