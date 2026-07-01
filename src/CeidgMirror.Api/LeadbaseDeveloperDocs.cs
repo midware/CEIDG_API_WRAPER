@@ -24,6 +24,7 @@ internal static class LeadbaseDeveloperDocs
     <nav class="nav" aria-label="Nawigacja dokumentacji">
       <a href="/docs">Dokumentacja</a>
       <a href="/docs#quickstart">Quickstart</a>
+      <a href="/docs#examples">Przykłady</a>
       <a href="/docs#companies">Firmy</a>
       <a href="/docs#analytics">Analityka</a>
       <a href="/swagger">Swagger</a>
@@ -40,6 +41,7 @@ internal static class LeadbaseDeveloperDocs
       <a href="#start">Start</a>
       <a href="#auth">Autoryzacja</a>
       <a href="#quickstart">Quickstart</a>
+      <a href="#examples">Przykłady implementacji</a>
       <a href="#companies">Wyszukiwanie firm</a>
       <a href="#columns">Kolumny i koszt</a>
       <a href="#history">Aktualne i historyczne wpisy</a>
@@ -125,6 +127,201 @@ Content-Type: application/json
     }
   ]
 }</code></pre>
+      </section>
+
+      <section class="docs-section" id="examples">
+        <h2>Przykłady implementacji</h2>
+        <p>W przykładach używamy tego samego zapytania: wyszukanie firmy po NIP i pobranie tylko wybranych kolumn. Klucz API trzymaj w zmiennej środowiskowej, sekrecie CI/CD albo managerze sekretów, a nie w kodzie źródłowym.</p>
+        <div class="docs-grid two code-sample-grid">
+          <div class="docs-card code-sample">
+            <h3>C# / .NET</h3>
+            <pre><code>using System.Net.Http.Headers;
+
+var apiKey = Environment.GetEnvironmentVariable("LEADBASE_API_KEY");
+using var http = new HttpClient
+{
+    BaseAddress = new Uri("https://leadbase.network")
+};
+
+http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+var url = "/companies?nip=7312045678&amp;columns=nip,name,status,city,mainPkdCode";
+var json = await http.GetStringAsync(url);
+Console.WriteLine(json);</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>TypeScript</h3>
+            <pre><code>type CompanyResponse = {
+  returnedRows: number;
+  tokenCost: number;
+  items: Array&lt;Record&lt;string, unknown&gt;&gt;;
+};
+
+const apiKey = process.env.LEADBASE_API_KEY!;
+const url = new URL("https://leadbase.network/companies");
+url.searchParams.set("nip", "7312045678");
+url.searchParams.set("columns", "nip,name,status,city,mainPkdCode");
+
+const response = await fetch(url, {
+  headers: { "X-Api-Key": apiKey }
+});
+
+if (!response.ok) throw new Error(await response.text());
+const data = await response.json() as CompanyResponse;
+console.log(data.items);</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>JavaScript</h3>
+            <pre><code>const apiKey = process.env.LEADBASE_API_KEY;
+const params = new URLSearchParams({
+  nip: "7312045678",
+  columns: "nip,name,status,city,mainPkdCode"
+});
+
+const response = await fetch(`https://leadbase.network/companies?${params}`, {
+  headers: { "X-Api-Key": apiKey }
+});
+
+if (!response.ok) {
+  throw new Error(await response.text());
+}
+
+const data = await response.json();
+console.log(data.items);</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>Java</h3>
+            <pre><code>import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+var apiKey = System.getenv("LEADBASE_API_KEY");
+var client = HttpClient.newHttpClient();
+var uri = URI.create(
+    "https://leadbase.network/companies?nip=7312045678"
+    + "&amp;columns=nip,name,status,city,mainPkdCode");
+
+var request = HttpRequest.newBuilder(uri)
+    .header("X-Api-Key", apiKey)
+    .GET()
+    .build();
+
+var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+if (response.statusCode() &gt;= 400) throw new RuntimeException(response.body());
+System.out.println(response.body());</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>PHP</h3>
+            <pre><code>&lt;?php
+$apiKey = getenv('LEADBASE_API_KEY');
+$query = http_build_query([
+    'nip' =&gt; '7312045678',
+    'columns' =&gt; 'nip,name,status,city,mainPkdCode',
+]);
+
+$ch = curl_init("https://leadbase.network/companies?$query");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER =&gt; true,
+    CURLOPT_HTTPHEADER =&gt; ["X-Api-Key: $apiKey"],
+]);
+
+$body = curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+curl_close($ch);
+
+if ($status &gt;= 400) {
+    throw new RuntimeException($body);
+}
+
+$data = json_decode($body, true);
+print_r($data['items']);</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>Rust</h3>
+            <pre><code>#[tokio::main]
+async fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    let api_key = std::env::var("LEADBASE_API_KEY")?;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("https://leadbase.network/companies")
+        .query(&amp;[
+            ("nip", "7312045678"),
+            ("columns", "nip,name,status,city,mainPkdCode"),
+        ])
+        .header("X-Api-Key", api_key)
+        .send()
+        .await?
+        .error_for_status()?;
+
+    let body = response.text().await?;
+    println!("{body}");
+    Ok(())
+}</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>C++</h3>
+            <pre><code>// Przykład z libcurl.
+#include &lt;curl/curl.h&gt;
+#include &lt;cstdlib&gt;
+#include &lt;iostream&gt;
+#include &lt;string&gt;
+
+static size_t writeBody(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    auto* body = static_cast&lt;std::string*&gt;(userdata);
+    body-&gt;append(ptr, size * nmemb);
+    return size * nmemb;
+}
+
+int main() {
+    const char* apiKey = std::getenv("LEADBASE_API_KEY");
+    CURL* curl = curl_easy_init();
+    std::string body;
+
+    curl_easy_setopt(curl, CURLOPT_URL,
+        "https://leadbase.network/companies?nip=7312045678&amp;columns=nip,name,status,city,mainPkdCode");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeBody);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &amp;body);
+
+    std::string header = std::string("X-Api-Key: ") + apiKey;
+    curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, header.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    CURLcode result = curl_easy_perform(curl);
+    if (result == CURLE_OK) std::cout &lt;&lt; body &lt;&lt; std::endl;
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+}</code></pre>
+          </div>
+
+          <div class="docs-card code-sample">
+            <h3>Python</h3>
+            <pre><code>import os
+import requests
+
+api_key = os.environ["LEADBASE_API_KEY"]
+response = requests.get(
+    "https://leadbase.network/companies",
+    headers={"X-Api-Key": api_key},
+    params={
+        "nip": "7312045678",
+        "columns": "nip,name,status,city,mainPkdCode",
+    },
+    timeout=30,
+)
+response.raise_for_status()
+print(response.json()["items"])</code></pre>
+          </div>
+        </div>
       </section>
 
       <section class="docs-section" id="companies">

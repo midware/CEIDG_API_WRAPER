@@ -1538,3 +1538,23 @@ ul { padding-left: 18px; }
     align-items: stretch;
   }
 }
+.code-sample-grid {
+  align-items: stretch;
+}
+
+.code-sample {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.code-sample pre {
+  flex: 1;
+  max-height: 430px;
+}
+
+.code-sample h3 {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
