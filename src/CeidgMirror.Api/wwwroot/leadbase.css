@@ -185,6 +185,23 @@ ul { padding-left: 18px; }
 .unit-price { display: block; margin: 8px 0 12px; color: #214147; font-size: 13px; line-height: 1.35; }
 .price-grid .featured { border-color: rgba(8, 127, 122, .45); box-shadow: var(--shadow); }
 .price-grid .button { margin-top: 8px; width: 100%; }
+.analytics-preview {
+  display: grid;
+  grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.analytics-preview span { color: var(--muted); font-size: 13px; font-weight: 800; }
+.analytics-preview strong { display: block; margin-top: 8px; font-size: 30px; line-height: 1.1; }
+.analytics-preview p { margin: 8px 0 0; color: var(--muted); }
+.mini-bars { display: flex; align-items: end; gap: 10px; min-height: 190px; padding: 12px 0 28px; }
+.mini-bars i { position: relative; flex: 1; min-width: 44px; border-radius: 6px 6px 0 0; background: var(--teal); opacity: .9; }
+.mini-bars b { position: absolute; left: 50%; bottom: -24px; transform: translateX(-50%); width: max-content; max-width: 120px; color: #405159; font-size: 11px; font-style: normal; text-align: center; }
 
 .docs-band {
   max-width: 1200px;
@@ -222,6 +239,7 @@ ul { padding-left: 18px; }
   .hero { grid-template-columns: 1fr; padding: 56px 22px 34px; }
   .hero-product { min-height: auto; padding-bottom: 160px; }
   .step-grid, .price-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-preview { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

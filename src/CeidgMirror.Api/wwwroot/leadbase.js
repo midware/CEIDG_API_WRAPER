@@ -115,8 +115,8 @@
 
   form.addEventListener('submit', runQuery);
   renderTable([
-    { nip: '7312045678', name: 'FIRMA ABC JAN KOWALSKI', city: 'Warszawa', email: 'biuro@firmaabc.pl', www: 'firmaabc.pl', pkd: '62.01.Z', status: 'Aktywny' },
-    { nip: '9491832736', name: 'PV SOLUTIONS SPOLKA Z O.O.', city: 'Krakow', email: 'kontakt@pvsolutions.pl', www: 'pvsolutions.pl', pkd: '43.21.Z', status: 'Aktywny' }
+    { nip: '7312045678', name: 'FIRMA ABC JAN KOWALSKI', city: 'Warszawa', pkd: '62.01.Z', status: 'Aktywny' },
+    { nip: '9491832736', name: 'PV SOLUTIONS SPOLKA Z O.O.', city: 'Krakow', pkd: '43.21.Z', status: 'Aktywny' }
   ]);
   updateCounter();
 })();

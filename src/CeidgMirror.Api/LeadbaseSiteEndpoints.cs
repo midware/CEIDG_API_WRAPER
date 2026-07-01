@@ -335,7 +335,7 @@ public static class LeadbaseSiteEndpoints
 
     private static string[] ResolveDemoColumns(string? columns)
     {
-        var allowed = new[] { "ceidgId", "nip", "regon", "name", "status", "ownerFirstName", "ownerLastName", "city", "voivodeship", "street", "postalCode", "mainPkdCode", "phone", "email", "website", "pkdCodes", "rawDetailPayload" };
+        var allowed = new[] { "ceidgId", "nip", "regon", "name", "status", "ownerFirstName", "ownerLastName", "city", "voivodeship", "street", "postalCode", "mainPkdCode", "pkdCodes" };
         if (string.IsNullOrWhiteSpace(columns))
         {
             return allowed;
@@ -367,11 +367,7 @@ public static class LeadbaseSiteEndpoints
                 "street" => row.Street,
                 "postalcode" => row.PostalCode,
                 "mainpkdcode" => row.MainPkdCode,
-                "phone" => row.Phone,
-                "email" => row.Email,
-                "website" => row.Website,
                 "pkdcodes" => row.PkdCodes,
-                "rawdetailpayload" => row.RawDetailPayload,
                 _ => null
             };
         }
@@ -381,14 +377,14 @@ public static class LeadbaseSiteEndpoints
 
     private static readonly DemoCompany[] DemoCompanies =
     [
-        new("b18d8d43-4e20-49c0-8e21-000000000001", "7312045678", "141234567", "FIRMA ABC JAN KOWALSKI", "Aktywny", "Jan", "Kowalski", "Warszawa", "mazowieckie", "Marszalkowska 10", "00-590", "62.01.Z", "+48 501 100 200", "biuro@firmaabc.pl", "firmaabc.pl", "[\"62.01.Z\",\"62.02.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
-        new("b18d8d43-4e20-49c0-8e21-000000000002", "9491832736", "122334455", "PV SOLUTIONS SPOLKA Z O.O.", "Aktywny", "Anna", "Nowak", "Krakow", "malopolskie", "Dluga 8", "31-146", "43.21.Z", "+48 512 333 444", "kontakt@pvsolutions.pl", "pvsolutions.pl", "[\"43.21.Z\",\"35.11.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
-        new("b18d8d43-4e20-49c0-8e21-000000000003", "8762459076", "987654321", "SUN ENERGY S.C.", "Aktywny", "Piotr", "Zielinski", "Gdansk", "pomorskie", "Grunwaldzka 22", "80-236", "43.21.Z", "+48 533 220 110", "biuro@sunenergy.pl", "sunenergy.pl", "[\"43.21.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
-        new("b18d8d43-4e20-49c0-8e21-000000000004", "5223001189", "556677889", "EKO INSTALACJE DARIUSZ NOWAK", "Zawieszony", "Dariusz", "Nowak", "Poznan", "wielkopolskie", "Polna 5", "60-535", "43.21.Z", "+48 600 700 800", "d.nowak@ekoinstalacje.pl", "ekoinstalacje.pl", "[\"43.21.Z\",\"71.12.Z\"]", "{\"source\":\"demo\",\"contact\":true}"),
-        new("b18d8d43-4e20-49c0-8e21-000000000005", "1132894410", "101202303", "SOFTWARE LAB ANNA WISNIEWSKA", "Aktywny", "Anna", "Wisniewska", "Warszawa", "mazowieckie", "Prosta 51", "00-838", "62.02.Z", "+48 577 101 202", "hello@softwarelab.pl", "softwarelab.pl", "[\"62.02.Z\",\"63.11.Z\"]", "{\"source\":\"demo\",\"contact\":true}")
+        new("b18d8d43-4e20-49c0-8e21-000000000001", "7312045678", "141234567", "FIRMA ABC JAN KOWALSKI", "Aktywny", "Jan", "Kowalski", "Warszawa", "mazowieckie", "Marszalkowska 10", "00-590", "62.01.Z", "[\"62.01.Z\",\"62.02.Z\"]"),
+        new("b18d8d43-4e20-49c0-8e21-000000000002", "9491832736", "122334455", "PV SOLUTIONS SPOLKA Z O.O.", "Aktywny", "Anna", "Nowak", "Krakow", "malopolskie", "Dluga 8", "31-146", "43.21.Z", "[\"43.21.Z\",\"35.11.Z\"]"),
+        new("b18d8d43-4e20-49c0-8e21-000000000003", "8762459076", "987654321", "SUN ENERGY S.C.", "Aktywny", "Piotr", "Zielinski", "Gdansk", "pomorskie", "Grunwaldzka 22", "80-236", "43.21.Z", "[\"43.21.Z\"]"),
+        new("b18d8d43-4e20-49c0-8e21-000000000004", "5223001189", "556677889", "EKO INSTALACJE DARIUSZ NOWAK", "Zawieszony", "Dariusz", "Nowak", "Poznan", "wielkopolskie", "Polna 5", "60-535", "43.21.Z", "[\"43.21.Z\",\"71.12.Z\"]"),
+        new("b18d8d43-4e20-49c0-8e21-000000000005", "1132894410", "101202303", "SOFTWARE LAB ANNA WISNIEWSKA", "Aktywny", "Anna", "Wisniewska", "Warszawa", "mazowieckie", "Prosta 51", "00-838", "62.02.Z", "[\"62.02.Z\",\"63.11.Z\"]")
     ];
 
-    private sealed record DemoCompany(string CeidgId, string Nip, string Regon, string Name, string Status, string OwnerFirstName, string OwnerLastName, string City, string Voivodeship, string Street, string PostalCode, string MainPkdCode, string Phone, string Email, string Website, string PkdCodes, string RawDetailPayload);
+    private sealed record DemoCompany(string CeidgId, string Nip, string Regon, string Name, string Status, string OwnerFirstName, string OwnerLastName, string City, string Voivodeship, string Street, string PostalCode, string MainPkdCode, string PkdCodes);
     private const string HomeHtml = """
 <!doctype html>
 <html lang="pl">
@@ -442,16 +438,15 @@ public static class LeadbaseSiteEndpoints
 
       <div class="hero-product" id="api" aria-label="Podgląd API leadbase.network">
         <div class="code-window">
-          <div class="window-bar"><span>GET</span><code>/companies?columns=nip,name,email,www,pkd</code><b>200 OK</b></div>
+          <div class="window-bar"><span>GET</span><code>/companies?columns=nip,name,status,city,mainPkdCode</code><b>200 OK</b></div>
           <pre>{
   "success": true,
   "items": [
     {
       "nip": "7312045678",
       "name": "FIRMA ABC JAN KOWALSKI",
-      "email": "biuro@firmaabc.pl",
-      "www": "https://firmaabc.pl",
-      "pkd": "62.01.Z",
+      "city": "Warszawa",
+      "mainPkdCode": "62.01.Z",
       "status": "Aktywny"
     }
   ],
@@ -493,9 +488,6 @@ public static class LeadbaseSiteEndpoints
             <label><input type="checkbox" name="columns" value="street"> Ulica</label>
             <label><input type="checkbox" name="columns" value="postalCode"> Kod pocztowy</label>
             <label><input type="checkbox" name="columns" value="mainPkdCode" checked> Główne PKD</label>
-            <label><input type="checkbox" name="columns" value="phone" checked> Telefon</label>
-            <label><input type="checkbox" name="columns" value="email" checked> Email</label>
-            <label><input type="checkbox" name="columns" value="website" checked> WWW</label>
             <label><input type="checkbox" name="columns" value="pkdCodes"> Wszystkie PKD</label>
             <label><input type="checkbox" name="columns" value="rawDetailPayload"> Raw JSON</label>
           </fieldset>
@@ -519,19 +511,33 @@ public static class LeadbaseSiteEndpoints
       <div class="section-head"><h2>Do czego używać API?</h2><p>leadbase.network nadaje się zarówno do szybkiej weryfikacji pojedynczej firmy, jak i do budowania procesów sprzedażowych, CRM oraz scoringu B2B.</p></div>
       <div class="step-grid">
         <article><span>1</span><h3>Weryfikacja po NIP</h3><p>Sprawdź, czy firma istnieje, jest aktywna, zawieszona lub wykreślona przed wystawieniem faktury, podpisaniem umowy albo wysyłką oferty.</p></article>
-        <article><span>2</span><h3>Uzupełnianie CRM</h3><p>Dodawaj nazwę, status, miasto, PKD, stronę WWW i dane kontaktowe do rekordów leadów bez ręcznego przeszukiwania CEIDG.</p></article>
-        <article><span>3</span><h3>Segmentacja leadów</h3><p>Buduj listy firm po województwie, mieście, statusie, głównym PKD, obecności telefonu, emaila albo strony WWW.</p></article>
+        <article><span>2</span><h3>Uzupełnianie CRM</h3><p>Dodawaj nazwę, status, lokalizację i PKD do rekordów leadów bez ręcznego przeszukiwania CEIDG.</p></article>
+        <article><span>3</span><h3>Segmentacja leadów</h3><p>Buduj listy firm po województwie, mieście, statusie, głównym PKD, dacie rozpoczęcia działalności i profilu branżowym.</p></article>
         <article><span>4</span><h3>Monitoring kontrahentów</h3><p>Automatycznie odświeżaj status działalności i wykrywaj firmy zawieszone, zakończone lub z istotnymi zmianami danych.</p></article>
       </div>
     </section>
 
     <section class="steps" id="analityka">
-      <div class="section-head"><h2>Analityka zgodna z RODO</h2><p>Endpointy <code>/analytics</code> zwracają wyłącznie agregaty statystyczne, bez NIP, nazwisk, telefonu, emaila i pojedynczych rekordów firm.</p></div>
+      <div class="section-head"><h2>Analityka rynku</h2><p>Endpointy <code>/analytics</code> pokazują skalę branż, lokalizacji i statusów firm w formie agregatów gotowych do dashboardów i raportów.</p></div>
       <div class="step-grid">
         <article><span>PKD</span><h3>Potencjał branży</h3><p>Ile aktywnych firm o PKD 43.21.Z działa w Małopolsce i jaki procent wszystkich firm z tej branży stanowią.</p></article>
         <article><span>GEO</span><h3>Mapa rynku</h3><p>Ranking województw, powiatów, gmin lub miast według liczby aktywnych firm z wybranego segmentu.</p></article>
-        <article><span>CRM</span><h3>Jakość kontaktu</h3><p>Odsetek firm w segmencie, które mają email, telefon lub stronę WWW, zanim kupisz albo zbudujesz kampanię.</p></article>
+        <article><span>GEO</span><h3>Nasycenie lokalizacji</h3><p>Porównuj udział wybranej branży w województwach, powiatach, gminach i miastach.</p></article>
         <article><span>TREND</span><h3>Rocznik działalności</h3><p>Rozkład firm według roku rozpoczęcia działalności, statusu i lokalizacji, np. nowe firmy IT w dużych miastach.</p></article>
+      </div>
+      <div class="analytics-preview" aria-label="Przykładowy wykres analityczny">
+        <div>
+          <span>PKD 43.21.Z / Małopolskie</span>
+          <strong>12 840 aktywnych firm</strong>
+          <p>18,6% firm tej branży w analizowanym regionie</p>
+        </div>
+        <div class="mini-bars">
+          <i style="height:42%"><b>Kraków</b></i>
+          <i style="height:72%"><b>Tarnów</b></i>
+          <i style="height:55%"><b>Nowy Sącz</b></i>
+          <i style="height:88%"><b>Powiat krakowski</b></i>
+          <i style="height:64%"><b>Oświęcim</b></i>
+        </div>
       </div>
     </section>
 
@@ -546,12 +552,12 @@ public static class LeadbaseSiteEndpoints
     </section>
 
     <section class="pricing" id="cennik">
-      <div class="section-head"><h2>Pakiety tokenów</h2><p>Token rozliczamy jako koszt pobranego profilu firmy, a nie każdej pojedynczej kolumny. Dane kontaktowe i raw JSON kosztują więcej, ale podstawowe wyszukiwanie pozostaje tanie.</p></div>
+      <div class="section-head"><h2>Pakiety tokenów</h2><p>Token rozliczamy jako koszt pobranego profilu firmy i zakresu danych. Podstawowe wyszukiwanie pozostaje tanie, a pełne surowe payloady mają wyższą wagę.</p></div>
       <div class="price-grid">
-        <article><small>STARTER</small><h3>49 zł</h3><p>50 000 tokenów</p><strong class="unit-price">0,98 zł / 1000 tokenów</strong><ul><li>około 50 000 profili podstawowych</li><li>około 25 000 profili z kontaktem</li><li>około 1 020 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
-        <article class="featured"><small>GROWTH</small><h3>149 zł</h3><p>250 000 tokenów</p><strong class="unit-price">0,596 zł / 1000 tokenów</strong><ul><li>około 250 000 profili podstawowych</li><li>około 125 000 profili z kontaktem</li><li>około 1 678 tokenów za 1 zł</li></ul><a class="button button-primary" href="/register">Wybierz pakiet</a></article>
-        <article><small>SCALE</small><h3>399 zł</h3><p>1 000 000 tokenów</p><strong class="unit-price">0,399 zł / 1000 tokenów</strong><ul><li>około 1 000 000 profili podstawowych</li><li>około 500 000 profili z kontaktem</li><li>około 2 506 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
-        <article><small>ENTERPRISE</small><h3>999 zł</h3><p>3 000 000 tokenów</p><strong class="unit-price">0,333 zł / 1000 tokenów</strong><ul><li>wysoki wolumen</li><li>indywidualne limity i SLA</li><li>około 3 003 tokenów za 1 zł</li></ul><a class="button button-ghost" href="mailto:kontakt@leadbase.network">Skontaktuj się</a></article>
+        <article><small>STARTER</small><h3>49 zł</h3><p>50 000 tokenów</p><strong class="unit-price">0,98 zł / 1000 tokenów</strong><ul><li>około 50 000 profili podstawowych</li><li>około 25 000 rozszerzonych profili</li><li>około 1 020 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article class="featured"><small>GROWTH</small><h3>149 zł</h3><p>250 000 tokenów</p><strong class="unit-price">0,596 zł / 1000 tokenów</strong><ul><li>około 250 000 profili podstawowych</li><li>około 125 000 rozszerzonych profili</li><li>około 1 678 tokenów za 1 zł</li></ul><a class="button button-primary" href="/register">Wybierz pakiet</a></article>
+        <article><small>SCALE</small><h3>399 zł</h3><p>1 000 000 tokenów</p><strong class="unit-price">0,399 zł / 1000 tokenów</strong><ul><li>około 1 000 000 profili podstawowych</li><li>około 500 000 rozszerzonych profili</li><li>około 2 506 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Wybierz pakiet</a></article>
+        <article><small>ENTERPRISE</small><h3>999 zł</h3><p>3 000 000 tokenów</p><strong class="unit-price">0,333 zł / 1000 tokenów</strong><ul><li>wysoki wolumen</li><li>indywidualne limity i SLA</li><li>około 3 003 tokenów za 1 zł</li></ul><a class="button button-ghost" href="/register">Zapytaj o pakiet</a></article>
       </div>
     </section>
 
