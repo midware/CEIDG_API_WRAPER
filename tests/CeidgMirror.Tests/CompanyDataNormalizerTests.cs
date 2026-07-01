@@ -66,4 +66,16 @@ public sealed class CompanyDataNormalizerTests
     {
         Assert.Equal(expected, CompanyDataNormalizer.NormalizePkdCode(input));
     }
+
+    [Fact]
+    public void NormalizePhones_ReturnsStructuredMobileLandlineAndJson()
+    {
+        var phones = CompanyDataNormalizer.NormalizePhones("+48 94 3585597, 607127747");
+
+        Assert.Equal("+48 94 358 55 97, +48607127747", phones.All);
+        Assert.Equal("+48607127747", phones.Mobile);
+        Assert.Equal("+48 94 358 55 97", phones.Landline);
+        Assert.Contains("\"type\":\"landline\"", phones.Json);
+        Assert.Contains("\"type\":\"mobile\"", phones.Json);
+    }
 }

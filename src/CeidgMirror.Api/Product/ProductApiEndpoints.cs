@@ -59,6 +59,7 @@ public static class ProductApiEndpoints
         services.AddSingleton(_ => NpgsqlDataSource.Create(postgresOptions.ConnectionString));
         services.AddSingleton<ProductApiStore>();
         services.AddSingleton<ProductAnalyticsStore>();
+        services.AddSingleton<ProductOperationsStore>();
         return services;
     }
 
@@ -301,6 +302,40 @@ public static class ProductApiEndpoints
                 : Results.Json(new { error = "Insufficient token balance.", requiredTokens = result.TokenCost, currentBalance = result.TokenBalanceAfter }, statusCode: StatusCodes.Status402PaymentRequired);
         })
         .WithSummary("Aggregate company distribution by selected dimension");
+
+        var operations = app.MapGroup("/operations").WithTags("Operations");
+
+        operations.MapGet("/data-quality", async (
+            [FromHeader(Name = "X-Api-Key")] string? apiKey,
+            ProductApiStore store,
+            ProductOperationsStore operationsStore,
+            CancellationToken cancellationToken) =>
+        {
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(await operationsStore.GetDataQualityReportAsync(cancellationToken));
+        })
+        .WithSummary("Get data quality report for the mirrored company table");
+
+        operations.MapGet("/import-metrics", async (
+            [FromHeader(Name = "X-Api-Key")] string? apiKey,
+            ProductApiStore store,
+            ProductOperationsStore operationsStore,
+            CancellationToken cancellationToken) =>
+        {
+            var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(await operationsStore.GetImportMetricsAsync(cancellationToken));
+        })
+        .WithSummary("Get CEIDG/KRS import progress and throughput metrics");
 
         return app;
     }
@@ -881,6 +916,9 @@ public static class CompanyColumnCatalog
         new CompanyColumn("krsRepresentatives", "krs_representatives::text", "krs_representatives", "KRS representatives JSON", 4),
         new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20),
         new CompanyColumn("phone", "phone", "phone", "Phone number", 3),
+        new CompanyColumn("phoneMobile", "phone_mobile", "phone_mobile", "Mobile phone numbers", 3),
+        new CompanyColumn("phoneLandline", "phone_landline", "phone_landline", "Landline phone numbers", 3),
+        new CompanyColumn("phonesJson", "phones_json::text", "phones_json", "Structured phone numbers JSON", 4),
         new CompanyColumn("email", "email", "email", "Email address", 3),
         new CompanyColumn("website", "website", "website", "Website", 3),
         new CompanyColumn("pkdCodes", "pkd_codes::text", "pkd_codes", "All PKD codes as JSON", 4),
@@ -907,7 +945,7 @@ public static class CompanyColumnCatalog
 
 public static class TokenPricing
 {
-    private static readonly string[] ContactColumns = { "phone", "email", "website" };
+    private static readonly string[] ContactColumns = { "phone", "phoneMobile", "phoneLandline", "phonesJson", "email", "website" };
 
     public static long CalculateCost(IReadOnlyList<CompanyColumn> columns, int returnedRows)
     {

@@ -164,6 +164,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         var ceidgId = ReadString(firma, "id") ?? indexItem?.CeidgId ?? ReadString(firma, "link") ?? throw new InvalidOperationException("CEIDG detail payload does not contain id or link.");
         var owner = TryGetProperty(firma, "wlasciciel", out var ownerElement) ? ownerElement : default;
         var address = TryGetProperty(firma, "adresDzialalnosci", out var addressElement) ? addressElement : default;
+        var normalizedPhones = CompanyDataNormalizer.NormalizePhones(ReadString(firma, "telefon"));
 
         await using var command = dataSource.CreateCommand("""
             insert into ceidg.company_records (
@@ -235,14 +236,17 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 restrictions,
                 legal_capacity_restrictions,
                 extraction_version,
-                extraction_warnings
+                extraction_warnings,
+                phone_mobile,
+                phone_landline,
+                phones_json
             )
             values (
                 $1, $2, $3, $4, $5, $6, now(), now(), $7, $8::jsonb, $9::jsonb,
                 $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29,
                 $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49,
                 $50, $51, $52, $53::jsonb, $54::jsonb, $55::jsonb, $56::jsonb, $57::jsonb, $58::jsonb, $59::jsonb,
-                $60::jsonb, $61::jsonb, $62::jsonb, $63::jsonb, $64::jsonb, $65::jsonb, 1, '[]'::jsonb
+                $60::jsonb, $61::jsonb, $62::jsonb, $63::jsonb, $64::jsonb, $65::jsonb, 1, '[]'::jsonb, $66, $67, $68::jsonb
             )
             on conflict (ceidg_id) do update set
                 source_index_url = excluded.source_index_url,
@@ -310,7 +314,10 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 restrictions = excluded.restrictions,
                 legal_capacity_restrictions = excluded.legal_capacity_restrictions,
                 extraction_version = excluded.extraction_version,
-                extraction_warnings = excluded.extraction_warnings
+                extraction_warnings = excluded.extraction_warnings,
+                phone_mobile = excluded.phone_mobile,
+                phone_landline = excluded.phone_landline,
+                phones_json = excluded.phones_json
             """);
 
         Add(command, Guid.NewGuid());
@@ -327,7 +334,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "nazwa")));
         Add(command, CompanyDataNormalizer.NormalizeStatus(ReadString(firma, "status")));
         Add(command, ReadInt(firma, "numerStatusu"));
-        Add(command, CompanyDataNormalizer.NormalizePhoneList(ReadString(firma, "telefon")));
+        Add(command, normalizedPhones.All);
         Add(command, CompanyDataNormalizer.NormalizeEmailList(ReadString(firma, "email")));
         Add(command, CompanyDataNormalizer.NormalizeWebsiteList(ReadString(firma, "www")));
         Add(command, CompanyDataNormalizer.CleanText(ReadString(firma, "adresDoreczenElektronicznych")));
@@ -378,6 +385,9 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         AddJson(command, ReadRaw(firma, "uprawnienia"));
         AddJson(command, ReadRaw(firma, "ograniczenia"));
         AddJson(command, ReadRaw(firma, "ograniczeniaZdolnosciPrawnej"));
+        Add(command, normalizedPhones.Mobile);
+        Add(command, normalizedPhones.Landline);
+        AddJson(command, normalizedPhones.Json);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

@@ -60,6 +60,9 @@ create table if not exists ceidg.company_records (
     registered_on date null,
     status_number integer null,
     phone text null,
+    phone_mobile text null,
+    phone_landline text null,
+    phones_json jsonb null,
     email text null,
     website text null,
     electronic_delivery_address text null,
@@ -128,6 +131,9 @@ create index if not exists ix_company_records_regon on ceidg.company_records (re
 create index if not exists ix_company_records_owner_nip on ceidg.company_records (owner_nip);
 create index if not exists ix_company_records_owner_regon on ceidg.company_records (owner_regon);
 create index if not exists ix_company_records_status on ceidg.company_records (status);
+create index if not exists ix_company_records_phone_mobile on ceidg.company_records (phone_mobile);
+create index if not exists ix_company_records_phone_landline on ceidg.company_records (phone_landline);
+create index if not exists ix_company_records_phones_json on ceidg.company_records using gin (phones_json);
 create index if not exists ix_company_records_legal_form on ceidg.company_records (legal_form);
 create index if not exists ix_company_records_registered_on on ceidg.company_records (registered_on);
 create index if not exists ix_company_records_main_pkd_code on ceidg.company_records (main_pkd_code);

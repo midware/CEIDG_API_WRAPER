@@ -71,7 +71,7 @@ dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 
 The worker is resumable. Progress is persisted in `source.import_checkpoint` after each processed company. Keep `MaxPages=0` and `MaxCompanies=0` for a full mirror.
 
-Imported CEIDG/KRS profile fields are normalized before writing to PostgreSQL: person/place/street casing, canonical voivodeship names, ISO-2 country codes, compact NIP/REGON/KRS/PKD values, lowercase email/website values, street names without a leading `ul.` prefix, and comma-separated Polish phone numbers: mobile as `+48xxxxxxxxx`, landline as `+48 XX XXX XX XX`. Raw registry payloads remain unchanged in `raw_detail_payload` / `raw_krs_payload` for audit and future reprocessing.
+Imported CEIDG/KRS profile fields are normalized before writing to PostgreSQL: person/place/street casing, canonical voivodeship names, ISO-2 country codes, compact NIP/REGON/KRS/PKD values, lowercase email/website values, street names without a leading `ul.` prefix, and comma-separated Polish phone numbers: mobile as `+48xxxxxxxxx`, landline as `+48 XX XXX XX XX`, plus structured `phone_mobile`, `phone_landline`, and `phones_json` columns. Raw registry payloads remain unchanged in `raw_detail_payload` / `raw_krs_payload` for audit and future reprocessing.
 
 Request pacing:
 
@@ -132,6 +132,8 @@ Core endpoints:
 - `GET /login`, `POST /login`, `GET /logout` - web login/logout with cookie session.
 - `GET /companies/columns` - lists selectable columns and token weights.
 - `GET /companies` - paginated company search with dynamic columns; requires `X-Api-Key`.
+- `GET /operations/data-quality` - data quality snapshot: missing NIP/REGON, invalid countries/phones, street prefix leftovers and duplicate NIP/REGON/KRS groups; requires `X-Api-Key`.
+- `GET /operations/import-metrics` - CEIDG/KRS import monitoring: last run, last checkpoint, imported/skipped/failed counts, running runs and last-run throughput; requires `X-Api-Key`.
 
 Example:
 

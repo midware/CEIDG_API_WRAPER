@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace CeidgMirror.Infrastructure.Normalization;
@@ -126,10 +127,16 @@ public static partial class CompanyDataNormalizer
 
     public static string? NormalizePhoneList(string? value)
     {
+        var phones = NormalizePhones(value);
+        return phones.All;
+    }
+
+    public static NormalizedPhoneSet NormalizePhones(string? value)
+    {
         var cleaned = CleanText(value);
         if (cleaned is null)
         {
-            return null;
+            return NormalizedPhoneSet.Empty;
         }
 
         var phones = new List<string>();
@@ -138,7 +145,26 @@ public static partial class CompanyDataNormalizer
             AddPhoneSegment(segment, phones);
         }
 
-        return phones.Count == 0 ? null : string.Join(", ", phones.Distinct(StringComparer.Ordinal).ToArray());
+        var distinct = phones.Distinct(StringComparer.Ordinal).ToArray();
+        if (distinct.Length == 0)
+        {
+            return NormalizedPhoneSet.Empty;
+        }
+
+        var mobile = distinct.Where(IsFormattedPolishMobile).ToArray();
+        var landline = distinct.Where(IsFormattedPolishLandline).ToArray();
+        var jsonItems = distinct.Select(phone => new
+        {
+            number = phone,
+            type = IsFormattedPolishMobile(phone) ? "mobile" : IsFormattedPolishLandline(phone) ? "landline" : "unknown",
+            countryCode = phone.StartsWith("+48", StringComparison.Ordinal) ? "PL" : null
+        }).ToArray();
+
+        return new NormalizedPhoneSet(
+            string.Join(", ", distinct),
+            mobile.Length == 0 ? null : string.Join(", ", mobile),
+            landline.Length == 0 ? null : string.Join(", ", landline),
+            JsonSerializer.Serialize(jsonItems));
     }
 
     public static string? NormalizeDigits(string? value, int? padLeft = null)
@@ -283,6 +309,12 @@ public static partial class CompanyDataNormalizer
     private static bool IsPolishMobile(string nineDigits) =>
         nineDigits.Length == 9 && PolishMobilePrefixes.Contains(nineDigits[..2]);
 
+    private static bool IsFormattedPolishMobile(string phone) =>
+        phone.Length == 12 && phone.StartsWith("+48", StringComparison.Ordinal) && IsPolishMobile(phone[3..]);
+
+    private static bool IsFormattedPolishLandline(string phone) =>
+        phone.StartsWith("+48 ", StringComparison.Ordinal);
+
     private static string RemoveDiacritics(string value)
     {
         var normalized = value.Normalize(NormalizationForm.FormD);
@@ -315,4 +347,9 @@ public static partial class CompanyDataNormalizer
 
     [GeneratedRegex(@"\b(Z|W|I|Oraz|O|Na|Pod|Przy)\b")]
     private static partial Regex SmallLegalWordsRegex();
+}
+
+public sealed record NormalizedPhoneSet(string? All, string? Mobile, string? Landline, string? Json)
+{
+    public static readonly NormalizedPhoneSet Empty = new(null, null, null, null);
 }
