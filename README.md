@@ -1,4 +1,4 @@
-﻿# CEIDG_API_WRAPER
+# CEIDG_API_WRAPER
 
 C#/.NET solution for mirroring CEIDG company data into PostgreSQL and exposing a paid/token-billed API over the local mirror.
 
@@ -100,10 +100,12 @@ dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 
 KRS pacing defaults:
 
-- 60 requests / 60 seconds.
-- Smooth interval: `KrsImport__MinimumRequestIntervalSeconds=1`.
+- 30 requests / 60 seconds.
+- 500 requests / 3600 seconds.
+- Smooth interval: `KrsImport__MinimumRequestIntervalSeconds=2`.
+- Transient PRS/KRS responses (`429`, `408`, `502`, `503`, `504`) retry the same KRS number with exponential backoff and respect `Retry-After` when the API sends it.
 
-For a full KRS bootstrap, start with a controlled seed or daily bulletin window and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`.
+For a full KRS bootstrap, start with a controlled seed or daily bulletin window and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`. If CEIDG and KRS imports are both enabled, the worker runs them in separate loops so one source does not block the other.
 
 ## API Locally
 
@@ -253,4 +255,3 @@ docker compose exec -T postgres psql -U ceidg -d ceidg_mirror < db/migrations/20
 - [CTO plan](docs/CTO_PLAN.md)
 - [CEIDG field coverage audit](docs/CEIDG_FIELD_AUDIT.md)
 - [leadbase.network product roadmap](docs/LEADBASE_PRODUCT_ROADMAP.md)
-

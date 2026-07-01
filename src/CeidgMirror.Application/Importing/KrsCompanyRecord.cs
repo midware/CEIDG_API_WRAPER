@@ -21,6 +21,7 @@ public sealed record KrsCompanyRecord(
     string? AddressBuilding,
     string? AddressUnit,
     string? AddressPostalCode,
+    string? ElectronicDeliveryAddress,
     string? MainPkdCode,
     string? PkdCodesJson,
     string? RepresentativesJson,

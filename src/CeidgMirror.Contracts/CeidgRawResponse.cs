@@ -7,7 +7,8 @@ public sealed record CeidgRawResponse(
     HttpStatusCode StatusCode,
     string Content,
     DateTimeOffset FetchedAtUtc,
-    string? ContentType = null)
+    string? ContentType = null,
+    TimeSpan? RetryAfter = null)
 {
     public bool IsSuccess => (int)StatusCode is >= 200 and <= 299;
 }

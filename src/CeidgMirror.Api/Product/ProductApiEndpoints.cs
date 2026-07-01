@@ -176,10 +176,9 @@ public static class ProductApiEndpoints
             [FromQuery] string? city,
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
+            [FromQuery] string? legalForm,
             [FromQuery] string? registrySource,
             [FromQuery] string? krsNumber,
-            [FromQuery] string? krsLegalForm,
-            [FromQuery] string? krsStatus,
             [FromQuery] bool? hasKrs,
             CancellationToken cancellationToken) =>
         {
@@ -199,7 +198,7 @@ public static class ProductApiEndpoints
             pageSize = pageSize <= 0 ? options.DefaultPageSize : pageSize;
             pageSize = Math.Min(pageSize, options.MaxPageSize);
 
-            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, registrySource, krsNumber, krsLegalForm, krsStatus, hasKrs, selectedColumns);
+            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, legalForm, registrySource, krsNumber, hasKrs, selectedColumns);
             var result = await store.SearchCompaniesAsync(user.UserId, user.ApiKeyId, query, cancellationToken);
 
             if (!result.Success)
@@ -235,9 +234,8 @@ public static class ProductApiEndpoints
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
             [FromQuery] string? pkdPrefix,
+            [FromQuery] string? legalForm,
             [FromQuery] string? registrySource,
-            [FromQuery] string? krsLegalForm,
-            [FromQuery] string? krsStatus,
             [FromQuery] bool? hasKrs,
             [FromQuery] bool? hasEmail,
             [FromQuery] bool? hasPhone,
@@ -252,7 +250,7 @@ public static class ProductApiEndpoints
                 return Results.Unauthorized();
             }
 
-            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, krsLegalForm, krsStatus, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, legalForm, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
             var result = await analyticsStore.GetSummaryAsync(user.UserId, user.ApiKeyId, filter, cancellationToken);
             return result.Success
                 ? Results.Ok(result.Data)
@@ -272,9 +270,8 @@ public static class ProductApiEndpoints
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
             [FromQuery] string? pkdPrefix,
+            [FromQuery] string? legalForm,
             [FromQuery] string? registrySource,
-            [FromQuery] string? krsLegalForm,
-            [FromQuery] string? krsStatus,
             [FromQuery] bool? hasKrs,
             [FromQuery] bool? hasEmail,
             [FromQuery] bool? hasPhone,
@@ -285,7 +282,7 @@ public static class ProductApiEndpoints
             [FromQuery] int minBucketSize,
             CancellationToken cancellationToken) =>
         {
-            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear", "registeredYear", "sourceProfile", "krsLegalForm", "krsStatus" };
+            var allowedDimensions = new[] { "voivodeship", "county", "municipality", "city", "status", "mainPkdCode", "startedYear", "registeredYear", "sourceProfile", "legalForm" };
             if (string.IsNullOrWhiteSpace(dimension) || !allowedDimensions.Contains(dimension, StringComparer.OrdinalIgnoreCase))
             {
                 return Results.BadRequest(new { error = "Unsupported analytics dimension.", allowedDimensions });
@@ -297,7 +294,7 @@ public static class ProductApiEndpoints
                 return Results.Unauthorized();
             }
 
-            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, krsLegalForm, krsStatus, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
+            var filter = new AnalyticsFilter(voivodeship, county, municipality, city, status, mainPkdCode, pkdPrefix, registrySource, legalForm, hasKrs, hasEmail, hasPhone, hasWebsite, startedFrom, startedTo);
             var result = await analyticsStore.GetDistributionAsync(user.UserId, user.ApiKeyId, dimension, filter, limit, minBucketSize, cancellationToken);
             return result.Success
                 ? Results.Ok(result.Data)
@@ -635,10 +632,9 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         AddTextFilter(where, parameters, "business_address_city", query.City, exact: false);
         AddTextFilter(where, parameters, "status", query.Status, exact: true);
         AddTextFilter(where, parameters, "main_pkd_code", query.MainPkdCode, exact: true);
+        AddTextFilter(where, parameters, "legal_form", query.LegalForm, exact: true);
         AddRegistrySourceFilter(where, parameters, query.RegistrySource);
         AddTextFilter(where, parameters, "krs_number", query.KrsNumber, exact: true);
-        AddTextFilter(where, parameters, "krs_legal_form", query.KrsLegalForm, exact: true);
-        AddTextFilter(where, parameters, "krs_status", query.KrsStatus, exact: true);
         AddKrsPresenceFilter(where, query.HasKrs);
 
         var whereSql = where.Count == 0 ? "" : " where " + string.Join(" and ", where);
@@ -846,7 +842,7 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
 }
 
 public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance, bool EmailConfirmed);
-public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, string? RegistrySource, string? KrsNumber, string? KrsLegalForm, string? KrsStatus, bool? HasKrs, IReadOnlyList<CompanyColumn> Columns);
+public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, string? LegalForm, string? RegistrySource, string? KrsNumber, bool? HasKrs, IReadOnlyList<CompanyColumn> Columns);
 
 public sealed record CompanySearchResult(bool Success, IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, long TotalRows, long TokenCost, long TokenBalanceAfter)
 {
@@ -880,11 +876,8 @@ public static class CompanyColumnCatalog
         new CompanyColumn("registrySources", "registry_sources::text", "registry_sources", "Source registries", 1),
         new CompanyColumn("krsNumber", "krs_number", "krs_number", "KRS number", 1),
         new CompanyColumn("krsRegisterType", "krs_register_type", "krs_register_type", "KRS register type", 1),
-        new CompanyColumn("krsLegalForm", "krs_legal_form", "krs_legal_form", "KRS legal form", 1),
         new CompanyColumn("krsCourtName", "krs_court_name", "krs_court_name", "KRS court", 1),
         new CompanyColumn("krsLastEntryDate", "krs_last_entry_date", "krs_last_entry_date", "KRS last entry date", 1),
-        new CompanyColumn("krsStatus", "krs_status", "krs_status", "KRS source status", 1),
-        new CompanyColumn("krsAddress", "krs_address::text", "krs_address", "KRS address JSON", 2),
         new CompanyColumn("krsRepresentatives", "krs_representatives::text", "krs_representatives", "KRS representatives JSON", 4),
         new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20),
         new CompanyColumn("phone", "phone", "phone", "Phone number", 3),

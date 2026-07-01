@@ -426,34 +426,32 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                     ),
                     krs_number = $2,
                     krs_register_type = $3,
-                    krs_legal_form = $4,
-                    krs_court_name = $5,
-                    krs_last_entry_date = $6,
-                    krs_status = $7,
-                    krs_address = $8::jsonb,
-                    krs_representatives = $9::jsonb,
-                    raw_krs_payload = $10::jsonb,
-                    krs_updated_at_utc = $11,
-                    source_detail_url = coalesce(source_detail_url, $12),
-                    last_detail_source_hash = coalesce(last_detail_source_hash, $13),
-                    last_import_run_id = $14,
-                    nip = coalesce(nullif(nip, ''), $15),
-                    regon = coalesce(nullif(regon, ''), $16),
-                    name = coalesce(nullif(name, ''), $17),
-                    status = coalesce(nullif(status, ''), $18),
-                    legal_form = coalesce($19, legal_form),
-                    registered_on = coalesce($20, registered_on),
-                    business_address_country = coalesce($21, nullif(business_address_country, '')),
-                    business_address_voivodeship = coalesce($22, nullif(business_address_voivodeship, '')),
-                    business_address_county = coalesce($23, nullif(business_address_county, '')),
-                    business_address_municipality = coalesce($24, nullif(business_address_municipality, '')),
-                    business_address_city = coalesce($25, nullif(business_address_city, '')),
-                    business_address_street = coalesce($26, nullif(business_address_street, '')),
-                    business_address_building = coalesce($27, nullif(business_address_building, '')),
-                    business_address_unit = coalesce($28, nullif(business_address_unit, '')),
-                    business_address_postal_code = coalesce($29, nullif(business_address_postal_code, '')),
-                    main_pkd_code = coalesce($30, nullif(main_pkd_code, '')),
-                    pkd_codes = coalesce($31::jsonb, pkd_codes),
+                    krs_court_name = $4,
+                    krs_last_entry_date = $5,
+                    krs_representatives = $6::jsonb,
+                    raw_krs_payload = $7::jsonb,
+                    krs_updated_at_utc = $8,
+                    source_detail_url = coalesce(source_detail_url, $9),
+                    last_detail_source_hash = coalesce(last_detail_source_hash, $10),
+                    last_import_run_id = $11,
+                    nip = coalesce(nullif(nip, ''), $12),
+                    regon = coalesce(nullif(regon, ''), $13),
+                    name = coalesce(nullif(name, ''), $14),
+                    status = coalesce(nullif(status, ''), $15),
+                    legal_form = coalesce($16, legal_form),
+                    registered_on = coalesce($17, registered_on),
+                    electronic_delivery_address = coalesce($18, nullif(electronic_delivery_address, '')),
+                    business_address_country = coalesce($19, nullif(business_address_country, '')),
+                    business_address_voivodeship = coalesce($20, nullif(business_address_voivodeship, '')),
+                    business_address_county = coalesce($21, nullif(business_address_county, '')),
+                    business_address_municipality = coalesce($22, nullif(business_address_municipality, '')),
+                    business_address_city = coalesce($23, nullif(business_address_city, '')),
+                    business_address_street = coalesce($24, nullif(business_address_street, '')),
+                    business_address_building = coalesce($25, nullif(business_address_building, '')),
+                    business_address_unit = coalesce($26, nullif(business_address_unit, '')),
+                    business_address_postal_code = coalesce($27, nullif(business_address_postal_code, '')),
+                    main_pkd_code = coalesce($28, nullif(main_pkd_code, '')),
+                    pkd_codes = coalesce($29::jsonb, pkd_codes),
                     updated_at_utc = now()
                 where id = $1
                 """, connection, transaction);
@@ -485,15 +483,13 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 status,
                 krs_number,
                 krs_register_type,
-                krs_legal_form,
                 krs_court_name,
                 krs_last_entry_date,
-                krs_status,
-                krs_address,
                 krs_representatives,
                 krs_updated_at_utc,
                 legal_form,
                 registered_on,
+                electronic_delivery_address,
                 business_address_country,
                 business_address_voivodeship,
                 business_address_county,
@@ -510,8 +506,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17,
-                $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14,
+                $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28::jsonb, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
@@ -523,14 +519,11 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(insert, record.Nip);
             Add(insert, record.Regon);
             Add(insert, record.Name);
-            Add(insert, MapKrsStatusToCanonical(record.Status));
+            Add(insert, MapSourceStatusToCanonical(record.Status));
             Add(insert, record.KrsNumber);
             Add(insert, record.RegisterType);
-            Add(insert, record.LegalForm);
             Add(insert, record.CourtName);
             Add(insert, record.LastEntryDate);
-            Add(insert, record.Status);
-            AddJson(insert, record.AddressJson);
             AddJson(insert, record.RepresentativesJson);
             Add(insert, record.FetchedAtUtc);
             AddKrsUnifiedParameters(insert, record);
@@ -544,11 +537,8 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
     {
         Add(command, record.KrsNumber);
         Add(command, record.RegisterType);
-        Add(command, record.LegalForm);
         Add(command, record.CourtName);
         Add(command, record.LastEntryDate);
-        Add(command, record.Status);
-        AddJson(command, record.AddressJson);
         AddJson(command, record.RepresentativesJson);
         AddJson(command, record.RawJson);
         Add(command, record.FetchedAtUtc);
@@ -558,7 +548,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.Nip);
         Add(command, record.Regon);
         Add(command, record.Name);
-        Add(command, MapKrsStatusToCanonical(record.Status));
+        Add(command, MapSourceStatusToCanonical(record.Status));
         AddKrsUnifiedParameters(command, record);
     }
 
@@ -566,6 +556,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
     {
         Add(command, record.LegalForm);
         Add(command, record.RegistrationDate);
+        Add(command, record.ElectronicDeliveryAddress);
         Add(command, record.AddressCountry);
         Add(command, record.AddressVoivodeship);
         Add(command, record.AddressCounty);
@@ -578,8 +569,9 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.MainPkdCode);
         AddJson(command, record.PkdCodesJson);
     }
-    private static string? MapKrsStatusToCanonical(string? krsStatus) =>
-        krsStatus?.Trim() switch
+
+    private static string? MapSourceStatusToCanonical(string? sourceStatus) =>
+        sourceStatus?.Trim() switch
         {
             "1" => "AKTYWNY",
             "2" => "WYKRESLONY",

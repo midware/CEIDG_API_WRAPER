@@ -54,6 +54,7 @@ public static class KrsCurrentExcerptParser
             ReadString(address, "nrDomu"),
             ReadString(address, "nrLokalu"),
             ReadString(address, "kodPocztowy"),
+            ReadString(seatAndAddress, "adresDoDoreczenElektronicznychWpisanyDoBAE") ?? FindFirstString(root, "adresDoreczenElektronicznych"),
             mainPkdCode,
             pkdCodesJson,
             representatives,

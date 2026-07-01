@@ -13,9 +13,15 @@ public sealed class KrsImportOptions
     public DateOnly? EndDate { get; init; }
     public bool Resume { get; init; } = true;
     public int MaxItems { get; init; } = 0;
-    public int RequestLimit { get; init; } = 60;
+    public int RequestLimit { get; init; } = 30;
     public int WindowSeconds { get; init; } = 60;
-    public int MinimumRequestIntervalSeconds { get; init; } = 1;
+    public int HourlyRequestLimit { get; init; } = 500;
+    public int HourlyWindowSeconds { get; init; } = 3600;
+    public int MinimumRequestIntervalSeconds { get; init; } = 2;
     public int RequestTimeoutSeconds { get; init; } = 120;
+    public int LoopDelayMinutes { get; init; } = 60;
+    public int FailureRetryDelayMinutes { get; init; } = 5;
+    public int TransientBackoffBaseSeconds { get; init; } = 30;
+    public int TransientBackoffMaxSeconds { get; init; } = 900;
     public string[] SeedKrsNumbers { get; init; } = [];
 }

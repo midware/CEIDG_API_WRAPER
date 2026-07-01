@@ -1,8 +1,9 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using CeidgMirror.Application.Abstractions;
 using CeidgMirror.Application.Importing;
+using CeidgMirror.Contracts;
 using CeidgMirror.Infrastructure.Krs;
 using Microsoft.Extensions.Logging;
 
@@ -26,6 +27,7 @@ public sealed class KrsImportService(
         var imported = 0L;
         var skipped = 0L;
         var failed = 0L;
+        var throttled = 0L;
 
         try
         {
@@ -59,48 +61,70 @@ public sealed class KrsImportService(
                 }
 
                 var krsNumber = krsNumbers[index];
-                try
+                var transientAttempts = 0;
+                while (true)
                 {
-                    var response = await client.GetCurrentExcerptAsync(krsNumber, options.Register, cancellationToken);
-                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    try
                     {
-                        skipped++;
-                        logger.LogWarning("KRS {KrsNumber} was not found in register {Register}.", krsNumber, options.Register);
+                        var response = await client.GetCurrentExcerptAsync(krsNumber, options.Register, cancellationToken);
+                        if (IsTransient(response.StatusCode))
+                        {
+                            throttled++;
+                            transientAttempts++;
+                            var delay = CalculateTransientDelay(response, transientAttempts);
+                            logger.LogWarning(
+                                "KRS {KrsNumber} returned transient status {Status}. Retrying same item in {DelaySeconds:n0}s. Body: {Body}",
+                                krsNumber,
+                                (int)response.StatusCode,
+                                delay.TotalSeconds,
+                                Truncate(response.Content, 500));
+                            await Task.Delay(delay, cancellationToken);
+                            continue;
+                        }
+
+                        if (response.StatusCode == HttpStatusCode.NotFound)
+                        {
+                            skipped++;
+                            logger.LogWarning("KRS {KrsNumber} was not found in register {Register}.", krsNumber, options.Register);
+                        }
+                        else if (!IsSuccess(response.StatusCode))
+                        {
+                            failed++;
+                            logger.LogWarning(
+                                "KRS {KrsNumber} request failed with status {Status}. Body: {Body}",
+                                krsNumber,
+                                (int)response.StatusCode,
+                                Truncate(response.Content, 500));
+                        }
+                        else if (string.IsNullOrWhiteSpace(response.Content))
+                        {
+                            failed++;
+                            logger.LogWarning("KRS {KrsNumber} returned an empty response body.", krsNumber);
+                        }
+                        else
+                        {
+                            var record = KrsCurrentExcerptParser.Parse(response);
+                            await store.UpsertKrsCompanyAsync(record, importRunId, cancellationToken);
+                            imported++;
+                            logger.LogInformation("Imported KRS {KrsNumber} ({Name}).", record.KrsNumber, record.Name);
+                        }
+
+                        break;
                     }
-                    else if (!IsSuccess(response.StatusCode))
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         failed++;
-                        logger.LogWarning(
-                            "KRS {KrsNumber} request failed with status {Status}. Body: {Body}",
-                            krsNumber,
-                            (int)response.StatusCode,
-                            Truncate(response.Content, 500));
+                        logger.LogError(ex, "KRS {KrsNumber} import failed.", krsNumber);
+                        break;
                     }
-                    else if (string.IsNullOrWhiteSpace(response.Content))
-                    {
-                        failed++;
-                        logger.LogWarning("KRS {KrsNumber} returned an empty response body.", krsNumber);
-                    }
-                    else
-                    {
-                        var record = KrsCurrentExcerptParser.Parse(response);
-                        await store.UpsertKrsCompanyAsync(record, importRunId, cancellationToken);
-                        imported++;
-                        logger.LogInformation("Imported KRS {KrsNumber} ({Name}).", record.KrsNumber, record.Name);
-                    }
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    failed++;
-                    logger.LogError(ex, "KRS {KrsNumber} import failed.", krsNumber);
                 }
 
                 processedThisRun++;
-                await SaveCheckpointAsync(checkpointKey, index + 1, imported, skipped, failed, completed: index + 1 >= krsNumbers.Count, cancellationToken);
+                await SaveCheckpointAsync(checkpointKey, index + 1, imported, skipped, failed, throttled, completed: index + 1 >= krsNumbers.Count, cancellationToken);
             }
 
             var completed = nextIndex + processedThisRun >= krsNumbers.Count;
-            await SaveCheckpointAsync(checkpointKey, Math.Min(nextIndex + processedThisRun, krsNumbers.Count), imported, skipped, failed, completed, cancellationToken);
+            await SaveCheckpointAsync(checkpointKey, Math.Min(nextIndex + processedThisRun, krsNumbers.Count), imported, skipped, failed, throttled, completed, cancellationToken);
             await store.CompleteImportRunAsync(importRunId, completed ? "completed" : "partial", new
             {
                 options.Source,
@@ -109,6 +133,7 @@ public sealed class KrsImportService(
                 imported,
                 skipped,
                 failed,
+                throttled,
                 total = krsNumbers.Count,
                 completed
             }, cancellationToken);
@@ -121,7 +146,8 @@ public sealed class KrsImportService(
                 options.Register,
                 imported,
                 skipped,
-                failed
+                failed,
+                throttled
             }, cancellationToken);
             throw;
         }
@@ -169,6 +195,7 @@ public sealed class KrsImportService(
         long imported,
         long skipped,
         long failed,
+        long throttled,
         bool completed,
         CancellationToken cancellationToken)
     {
@@ -196,6 +223,7 @@ public sealed class KrsImportService(
             imported,
             skipped,
             failed,
+            throttled,
             completed
         }, cancellationToken);
     }
@@ -212,6 +240,29 @@ public sealed class KrsImportService(
     {
         var digits = new string(value.Where(char.IsDigit).ToArray());
         return string.IsNullOrWhiteSpace(digits) ? string.Empty : digits.PadLeft(10, '0');
+    }
+
+    private static bool IsTransient(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.TooManyRequests
+            or HttpStatusCode.RequestTimeout
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout
+            or HttpStatusCode.BadGateway;
+
+    private TimeSpan CalculateTransientDelay(CeidgRawResponse response, int attempt)
+    {
+        if (response.RetryAfter is { } retryAfter && retryAfter > TimeSpan.Zero)
+        {
+            return retryAfter <= TimeSpan.FromSeconds(options.TransientBackoffMaxSeconds)
+                ? retryAfter
+                : TimeSpan.FromSeconds(options.TransientBackoffMaxSeconds);
+        }
+
+        var baseSeconds = Math.Max(1, options.TransientBackoffBaseSeconds);
+        var maxSeconds = Math.Max(baseSeconds, options.TransientBackoffMaxSeconds);
+        var exponential = baseSeconds * Math.Pow(2, Math.Min(attempt - 1, 6));
+        var jitter = Random.Shared.NextDouble() * baseSeconds;
+        return TimeSpan.FromSeconds(Math.Min(maxSeconds, exponential + jitter));
     }
 
     private static bool IsSuccess(HttpStatusCode statusCode) =>

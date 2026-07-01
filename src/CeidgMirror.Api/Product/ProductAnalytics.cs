@@ -26,8 +26,7 @@ public sealed record AnalyticsFilter(
     string? MainPkdCode,
     string? PkdPrefix,
     string? RegistrySource,
-    string? KrsLegalForm,
-    string? KrsStatus,
+    string? LegalForm,
     bool? HasKrs,
     bool? HasEmail,
     bool? HasPhone,
@@ -183,8 +182,7 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         ["startedYear"] = "extract(year from started_on)::text",
         ["registeredYear"] = "extract(year from registered_on)::text",
         ["sourceProfile"] = "case when nullif(trim(coalesce(krs_number, '')), '') is not null and nullif(trim(coalesce(ceidg_id, '')), '') is not null then 'CEIDG+KRS' when nullif(trim(coalesce(krs_number, '')), '') is not null then 'KRS' else 'CEIDG' end",
-        ["krsLegalForm"] = "krs_legal_form",
-        ["krsStatus"] = "krs_status"
+        ["legalForm"] = "legal_form"
     };
 
     private static string BuildWhere(AnalyticsFilter filter, out List<NpgsqlParameter> parameters)
@@ -199,8 +197,7 @@ public sealed class ProductAnalyticsStore(NpgsqlDataSource dataSource)
         AddTextFilter(where, parameters, "status", filter.Status, exact: true);
         AddTextFilter(where, parameters, "main_pkd_code", filter.MainPkdCode, exact: true);
         AddRegistrySourceFilter(where, parameters, filter.RegistrySource);
-        AddTextFilter(where, parameters, "krs_legal_form", filter.KrsLegalForm, exact: true);
-        AddTextFilter(where, parameters, "krs_status", filter.KrsStatus, exact: true);
+        AddTextFilter(where, parameters, "legal_form", filter.LegalForm, exact: true);
         AddKrsPresenceFilter(where, filter.HasKrs);
 
         if (!string.IsNullOrWhiteSpace(filter.PkdPrefix))

@@ -11,7 +11,8 @@ public sealed class KrsRequestPacer
     {
         pacer = new SlidingWindowRequestPacer(
             TimeSpan.FromSeconds(options.MinimumRequestIntervalSeconds),
-            new SlidingWindowRequestPacer.Window(options.RequestLimit, TimeSpan.FromSeconds(options.WindowSeconds)));
+            new SlidingWindowRequestPacer.Window(options.RequestLimit, TimeSpan.FromSeconds(options.WindowSeconds)),
+            new SlidingWindowRequestPacer.Window(options.HourlyRequestLimit, TimeSpan.FromSeconds(options.HourlyWindowSeconds)));
     }
 
     public Task WaitForSlotAsync(CancellationToken cancellationToken) => pacer.WaitForSlotAsync(cancellationToken);

@@ -45,9 +45,15 @@ services:
       KrsImport__Register: ${KRS_IMPORT_REGISTER:-P}
       KrsImport__Resume: "true"
       KrsImport__MaxItems: ${KRS_IMPORT_MAX_ITEMS:-0}
-      KrsImport__RequestLimit: 60
+      KrsImport__RequestLimit: ${KRS_IMPORT_REQUEST_LIMIT:-30}
       KrsImport__WindowSeconds: 60
-      KrsImport__MinimumRequestIntervalSeconds: 1
+      KrsImport__HourlyRequestLimit: ${KRS_IMPORT_HOURLY_REQUEST_LIMIT:-500}
+      KrsImport__HourlyWindowSeconds: 3600
+      KrsImport__MinimumRequestIntervalSeconds: ${KRS_IMPORT_MIN_INTERVAL_SECONDS:-2}
+      KrsImport__LoopDelayMinutes: ${KRS_IMPORT_LOOP_DELAY_MINUTES:-60}
+      KrsImport__FailureRetryDelayMinutes: ${KRS_IMPORT_FAILURE_RETRY_DELAY_MINUTES:-5}
+      KrsImport__TransientBackoffBaseSeconds: ${KRS_IMPORT_BACKOFF_BASE_SECONDS:-30}
+      KrsImport__TransientBackoffMaxSeconds: ${KRS_IMPORT_BACKOFF_MAX_SECONDS:-900}
       Import__Enabled: "true"
       Import__RunOnce: "false"
       Import__Source: ChangesApi
