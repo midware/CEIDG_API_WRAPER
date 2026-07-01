@@ -176,6 +176,7 @@ th { color: #52616a; font-size: 12px; text-transform: uppercase; }
 .steps, .pricing, .dashboard { box-shadow: none; background: transparent; }
 .step-grid, .price-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .step-grid article, .price-grid article { padding: 24px; box-shadow: none; }
+.price-grid article { display: flex; flex-direction: column; }
 .step-grid span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: var(--ink); color: white; font-weight: 800; }
 h3 { margin: 18px 0 8px; font-size: 19px; }
 article p, li { color: var(--muted); line-height: 1.55; }
@@ -184,7 +185,8 @@ ul { padding-left: 18px; }
 .price-grid h3 { font-size: 32px; margin: 12px 0 6px; }
 .unit-price { display: block; margin: 8px 0 12px; color: #214147; font-size: 13px; line-height: 1.35; }
 .price-grid .featured { border-color: rgba(8, 127, 122, .45); box-shadow: var(--shadow); }
-.price-grid .button { margin-top: 8px; width: 100%; }
+.price-grid ul { flex: 1; }
+.price-grid .button { margin-top: auto; width: 100%; }
 .analytics-preview {
   display: grid;
   grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
