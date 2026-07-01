@@ -13,7 +13,7 @@ public static class LeadbaseSiteEndpoints
         app.MapGet("/", (HttpContext context) => Results.Content(RenderHomeHtml(context), "text/html; charset=utf-8"))
             .ExcludeFromDescription();
 
-        app.MapGet("/docs", () => Results.Redirect("/swagger"))
+        app.MapGet("/docs", () => Results.Content(LeadbaseDeveloperDocs.Render(), "text/html; charset=utf-8"))
             .ExcludeFromDescription();
 
         app.MapGet("/app", async (HttpContext context, ProductApiStore store, ProductOperationsStore operationsStore, CancellationToken cancellationToken) =>
@@ -130,13 +130,13 @@ public static class LeadbaseSiteEndpoints
 <body>
   <header class="site-header">
     <a class="brand" href="/"><span class="brand-mark">lb</span><span>leadbase.network</span></a>
-    <nav class="nav"><a href="/app">Panel</a><a href="/swagger">Dokumentacja</a><a href="/#tester">Tester</a></nav>
+    <nav class="nav"><a href="/app">Panel</a><a href="/docs">Dokumentacja</a><a href="/#tester">Tester</a></nav>
     <div class="header-actions"><span class="account-chip">{Html(account.Email)}</span><a class="button button-primary" href="/logout">Wyloguj się</a></div>
   </header>
   <main class="real-app-shell">
     <section class="real-app-head">
       <div><h1>Panel użytkownika</h1><p>Zarządzaj kluczami API, tokenami i historią użycia leadbase.network.</p></div>
-      <a class="button button-secondary" href="/swagger">Dokumentacja API</a>
+      <a class="button button-secondary" href="/docs">Dokumentacja API</a>
     </section>
     <section class="metrics app-metrics">
       <article><span>Email</span><b>{Html(account.Email)}</b></article>
@@ -145,7 +145,7 @@ public static class LeadbaseSiteEndpoints
       <article><span>Zapytania API</span><b>{account.QueryCount}</b></article>
     </section>
     <section class="dashboard-frame real-app-frame">
-      <aside><strong>leadbase</strong><a href="#summary">Podsumowanie</a><a href="#api-keys">Klucze API</a><a href="#tokens">Tokeny</a><a href="#usage">Historia użycia</a><a href="#data-quality">Jakość danych</a><a href="#imports">Importy</a><a href="/swagger">Swagger</a></aside>
+      <aside><strong>leadbase</strong><a href="#summary">Podsumowanie</a><a href="#api-keys">Klucze API</a><a href="#tokens">Tokeny</a><a href="#usage">Historia użycia</a><a href="#data-quality">Jakość danych</a><a href="#imports">Importy</a><a href="/docs">Dokumentacja</a><a href="/swagger">Swagger</a></aside>
       <div class="dash-main account-dashboard">
         <section class="panel-section" id="api-keys">
           <div class="panel-section-head"><div><h2>Klucze API</h2><p>Pełny klucz pokazujemy tylko raz po utworzeniu. W bazie przechowujemy hash oraz prefiks.</p></div></div>
@@ -513,11 +513,11 @@ public static class LeadbaseSiteEndpoints
       <a href="#zastosowania">Zastosowania</a>
       <a href="#analityka">Analityka</a>
       <a href="#cennik">Cennik</a>
-      <a href="/swagger">Dokumentacja</a>
+      <a href="/docs">Dokumentacja</a>
       <a href="#dashboard">Panel</a>
     </nav>
     <div class="header-actions">
-      <a class="button button-ghost" href="/swagger">Swagger</a>
+      <a class="button button-ghost" href="/swagger">OpenAPI</a>
       <a class="button button-primary" href="/register">Utwórz konto</a>
     </div>
   </header>
@@ -529,7 +529,7 @@ public static class LeadbaseSiteEndpoints
         <p>Wyszukuj firmy, wybieraj dokładnie te kolumny, których potrzebujesz, korzystaj ze stronicowanego API i płać tylko za realnie pobrane dane.</p>
         <div class="hero-actions">
           <a class="button button-primary button-large" href="/register">Utwórz konto</a>
-          <a class="button button-secondary button-large" href="/swagger">Zobacz Swagger</a>
+          <a class="button button-secondary button-large" href="/docs">Dokumentacja</a>
         </div>
         <div class="proof-grid" aria-label="Najważniejsze funkcje">
           <div><strong>Dane z CEIDG</strong><span>lokalny mirror PostgreSQL</span></div>
@@ -676,8 +676,8 @@ public static class LeadbaseSiteEndpoints
     </section>
 
     <section class="docs-band">
-      <div><h2>Dokumentacja dla developerów</h2><p>Swagger UI, przykłady zapytań i lista dostępnych kolumn są dostępne od razu w aplikacji.</p></div>
-      <a class="button button-primary" href="/swagger">Przejdź do dokumentacji</a>
+      <div><h2>Dokumentacja dla developerów</h2><p>Quickstart, autoryzacja, przykłady zapytań, lista kolumn, koszty tokenowe i Swagger jako narzędzie OpenAPI.</p></div>
+      <a class="button button-primary" href="/docs">Przejdź do dokumentacji</a>
     </section>
 
     <section class="dashboard" id="dashboard">
@@ -692,7 +692,7 @@ public static class LeadbaseSiteEndpoints
     </section>
   </main>
 
-  <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/terms">Regulamin</a><a href="/privacy">Prywatność</a><a href="/cookies">Cookies</a><a href="/opt-out">Opt-out</a><a href="/swagger">Swagger</a></footer>
+  <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/terms">Regulamin</a><a href="/privacy">Prywatność</a><a href="/cookies">Cookies</a><a href="/opt-out">Opt-out</a><a href="/docs">Dokumentacja</a><a href="/swagger">Swagger</a></footer>
   <script src="/leadbase.js"></script>
 </body>
 </html>
