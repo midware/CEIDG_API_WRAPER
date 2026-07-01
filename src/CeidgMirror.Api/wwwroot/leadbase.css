@@ -867,6 +867,93 @@ ul { padding-left: 18px; }
   line-height: 1.35;
 }
 
+
+
+.quality-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quality-grid article {
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfb;
+}
+
+.quality-grid span,
+.import-card dt,
+.panel-footnote {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quality-grid b {
+  display: block;
+  margin-top: 7px;
+  font-size: 24px;
+}
+
+.quality-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quality-details div,
+.import-card {
+  display: grid;
+  gap: 8px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.quality-details strong,
+.import-card strong {
+  font-size: 15px;
+}
+
+.quality-details span {
+  display: block;
+  color: #405159;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.import-card-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.import-card > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-card dl {
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.import-card dd {
+  color: #263940;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.panel-footnote {
+  margin: 0;
+  line-height: 1.45;
+}
+
 .api-key-list {
   display: grid;
   gap: 12px;
@@ -1091,6 +1178,7 @@ ul { padding-left: 18px; }
 }
 
 @media (max-width: 1040px) {
+  .quality-grid, .quality-details, .import-card-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .key-create-form { grid-template-columns: 1fr; }
   .key-create-form .button { margin-top: 0; }
   .api-key-card { grid-template-columns: 1fr; align-items: start; }
@@ -1099,6 +1187,7 @@ ul { padding-left: 18px; }
 }
 
 @media (max-width: 720px) {
+  .quality-grid, .quality-details, .import-card-list { grid-template-columns: 1fr; }
   .api-key-meta { grid-template-columns: 1fr; }
   .panel-section { padding: 18px; }
   .panel-section-head { flex-direction: column; }

@@ -174,6 +174,10 @@ public static class ProductApiEndpoints
             [FromQuery] string? nip,
             [FromQuery] string? regon,
             [FromQuery] string? name,
+            [FromQuery] string? country,
+            [FromQuery] string? voivodeship,
+            [FromQuery] string? county,
+            [FromQuery] string? municipality,
             [FromQuery] string? city,
             [FromQuery] string? status,
             [FromQuery] string? mainPkdCode,
@@ -181,6 +185,9 @@ public static class ProductApiEndpoints
             [FromQuery] string? registrySource,
             [FromQuery] string? krsNumber,
             [FromQuery] bool? hasKrs,
+            [FromQuery] bool? hasPhone,
+            [FromQuery] bool? hasEmail,
+            [FromQuery] bool? hasWebsite,
             CancellationToken cancellationToken) =>
         {
             var user = await RequireApiUserAsync(apiKey, store, cancellationToken);
@@ -199,7 +206,7 @@ public static class ProductApiEndpoints
             pageSize = pageSize <= 0 ? options.DefaultPageSize : pageSize;
             pageSize = Math.Min(pageSize, options.MaxPageSize);
 
-            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, city, status, mainPkdCode, legalForm, registrySource, krsNumber, hasKrs, selectedColumns);
+            var query = new CompanySearchQuery(page, pageSize, nip, regon, name, country, voivodeship, county, municipality, city, status, mainPkdCode, legalForm, registrySource, krsNumber, hasKrs, hasPhone, hasEmail, hasWebsite, selectedColumns);
             var result = await store.SearchCompaniesAsync(user.UserId, user.ApiKeyId, query, cancellationToken);
 
             if (!result.Success)
@@ -219,7 +226,11 @@ public static class ProductApiEndpoints
                 result.TokenBalanceAfter,
                 result.Items));
         })
-        .WithSummary("Search CEIDG companies with selectable columns and token billing");
+        .WithSummary("Search CEIDG/KRS companies with selectable columns, filters and token billing")
+        .WithDescription("Returns paginated company records from the local mirror. The columns query parameter accepts values from GET /companies/columns. Contact columns and raw payloads have higher token weight.")
+        .Produces<CompanySearchResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status402PaymentRequired);
 
 
         var analytics = app.MapGroup("/analytics").WithTags("Analytics");
@@ -319,7 +330,10 @@ public static class ProductApiEndpoints
 
             return Results.Ok(await operationsStore.GetDataQualityReportAsync(cancellationToken));
         })
-        .WithSummary("Get data quality report for the mirrored company table");
+        .WithSummary("Get data quality report for the mirrored company table")
+        .WithDescription("Returns operational counts for missing identifiers, invalid countries, invalid phones and duplicate NIP/REGON/KRS groups. This endpoint is informational and does not debit tokens.")
+        .Produces<DataQualityReportResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status401Unauthorized);
 
         operations.MapGet("/import-metrics", async (
             [FromHeader(Name = "X-Api-Key")] string? apiKey,
@@ -335,7 +349,10 @@ public static class ProductApiEndpoints
 
             return Results.Ok(await operationsStore.GetImportMetricsAsync(cancellationToken));
         })
-        .WithSummary("Get CEIDG/KRS import progress and throughput metrics");
+        .WithSummary("Get CEIDG/KRS import progress and throughput metrics")
+        .WithDescription("Returns latest import run status, checkpoint counters, 24h failures and records-per-minute metrics for each import source. This endpoint is informational and does not debit tokens.")
+        .Produces<ImportMetricsResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status401Unauthorized);
 
         return app;
     }
@@ -664,6 +681,10 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         AddTextFilter(where, parameters, "nip", query.Nip, exact: true);
         AddTextFilter(where, parameters, "regon", query.Regon, exact: true);
         AddTextFilter(where, parameters, "name", query.Name, exact: false);
+        AddTextFilter(where, parameters, "business_address_country", query.Country, exact: true);
+        AddTextFilter(where, parameters, "business_address_voivodeship", query.Voivodeship, exact: true);
+        AddTextFilter(where, parameters, "business_address_county", query.County, exact: false);
+        AddTextFilter(where, parameters, "business_address_municipality", query.Municipality, exact: false);
         AddTextFilter(where, parameters, "business_address_city", query.City, exact: false);
         AddTextFilter(where, parameters, "status", query.Status, exact: true);
         AddTextFilter(where, parameters, "main_pkd_code", query.MainPkdCode, exact: true);
@@ -671,6 +692,9 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         AddRegistrySourceFilter(where, parameters, query.RegistrySource);
         AddTextFilter(where, parameters, "krs_number", query.KrsNumber, exact: true);
         AddKrsPresenceFilter(where, query.HasKrs);
+        AddPresenceFilter(where, "phone", query.HasPhone);
+        AddPresenceFilter(where, "email", query.HasEmail);
+        AddPresenceFilter(where, "website", query.HasWebsite);
 
         var whereSql = where.Count == 0 ? "" : " where " + string.Join(" and ", where);
         var selectSql = string.Join(", ", query.Columns.Select(c => c.SqlExpression + " as " + c.SqlAlias));
@@ -873,11 +897,22 @@ public sealed class ProductApiStore(NpgsqlDataSource dataSource)
         where.Add(hasKrs.Value ? "nullif(trim(coalesce(krs_number, '')), '') is not null" : "nullif(trim(coalesce(krs_number, '')), '') is null");
     }
 
+    private static void AddPresenceFilter(List<string> where, string columnName, bool? hasValue)
+    {
+        if (hasValue is null)
+        {
+            return;
+        }
+
+        var predicate = $"nullif(trim(coalesce({columnName}, '')), '') is not null";
+        where.Add(hasValue.Value ? predicate : predicate.Replace(" is not null", " is null", StringComparison.Ordinal));
+    }
+
     private static NpgsqlParameter CloneParameter(NpgsqlParameter parameter) => new(parameter.ParameterName, parameter.Value);
 }
 
 public sealed record LoginUser(Guid UserId, string PasswordHash, long TokenBalance, bool EmailConfirmed);
-public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? City, string? Status, string? MainPkdCode, string? LegalForm, string? RegistrySource, string? KrsNumber, bool? HasKrs, IReadOnlyList<CompanyColumn> Columns);
+public sealed record CompanySearchQuery(int Page, int PageSize, string? Nip, string? Regon, string? Name, string? Country, string? Voivodeship, string? County, string? Municipality, string? City, string? Status, string? MainPkdCode, string? LegalForm, string? RegistrySource, string? KrsNumber, bool? HasKrs, bool? HasPhone, bool? HasEmail, bool? HasWebsite, IReadOnlyList<CompanyColumn> Columns);
 
 public sealed record CompanySearchResult(bool Success, IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, long TotalRows, long TokenCost, long TokenBalanceAfter)
 {
@@ -899,34 +934,64 @@ public static class CompanyColumnCatalog
         new CompanyColumn("regon", "regon", "regon", "REGON number", 1),
         new CompanyColumn("name", "name", "name", "Business name", 1),
         new CompanyColumn("status", "status", "status", "Business status", 1),
-        new CompanyColumn("legalForm", "legal_form", "legal_form", "Legal form", 1),
-        new CompanyColumn("registeredOn", "registered_on", "registered_on", "Registration/start date", 1),
+        new CompanyColumn("statusNumber", "status_number", "status_number", "CEIDG status number", 1),
+        new CompanyColumn("legalForm", "legal_form", "legal_form", "Unified legal form", 1),
+        new CompanyColumn("registeredOn", "registered_on", "registered_on", "Unified registration/start date", 1),
+        new CompanyColumn("startedOn", "started_on", "started_on", "CEIDG business start date", 1),
+        new CompanyColumn("suspendedOn", "suspended_on", "suspended_on", "CEIDG suspension date", 1),
+        new CompanyColumn("endedOn", "ended_on", "ended_on", "CEIDG end date", 1),
+        new CompanyColumn("removedOn", "removed_on", "removed_on", "CEIDG removal date", 1),
+        new CompanyColumn("resumedOn", "resumed_on", "resumed_on", "CEIDG resume date", 1),
         new CompanyColumn("ownerFirstName", "owner_first_name", "owner_first_name", "Owner first name", 1),
         new CompanyColumn("ownerLastName", "owner_last_name", "owner_last_name", "Owner last name", 1),
+        new CompanyColumn("ownerNip", "owner_nip", "owner_nip", "Owner NIP", 1),
+        new CompanyColumn("ownerRegon", "owner_regon", "owner_regon", "Owner REGON", 1),
+        new CompanyColumn("country", "business_address_country", "business_address_country", "Business country ISO-2 code", 1),
         new CompanyColumn("city", "business_address_city", "business_address_city", "Business city", 1),
         new CompanyColumn("voivodeship", "business_address_voivodeship", "business_address_voivodeship", "Business voivodeship", 1),
+        new CompanyColumn("county", "business_address_county", "business_address_county", "Business county", 1),
+        new CompanyColumn("municipality", "business_address_municipality", "business_address_municipality", "Business municipality", 1),
         new CompanyColumn("street", "business_address_street", "business_address_street", "Business street", 1),
+        new CompanyColumn("building", "business_address_building", "business_address_building", "Business building number", 1),
+        new CompanyColumn("unit", "business_address_unit", "business_address_unit", "Business unit number", 1),
         new CompanyColumn("postalCode", "business_address_postal_code", "business_address_postal_code", "Business postal code", 1),
+        new CompanyColumn("terc", "business_address_terc", "business_address_terc", "TERC identifier", 1),
+        new CompanyColumn("simc", "business_address_simc", "business_address_simc", "SIMC identifier", 1),
+        new CompanyColumn("ulic", "business_address_ulic", "business_address_ulic", "ULIC identifier", 1),
         new CompanyColumn("mainPkdCode", "main_pkd_code", "main_pkd_code", "Main PKD code", 1),
         new CompanyColumn("registrySources", "registry_sources::text", "registry_sources", "Source registries", 1),
         new CompanyColumn("krsNumber", "krs_number", "krs_number", "KRS number", 1),
         new CompanyColumn("krsRegisterType", "krs_register_type", "krs_register_type", "KRS register type", 1),
         new CompanyColumn("krsCourtName", "krs_court_name", "krs_court_name", "KRS court", 1),
         new CompanyColumn("krsLastEntryDate", "krs_last_entry_date", "krs_last_entry_date", "KRS last entry date", 1),
+        new CompanyColumn("krsUpdatedAtUtc", "krs_updated_at_utc", "krs_updated_at_utc", "Last KRS update timestamp", 1),
         new CompanyColumn("krsRepresentatives", "krs_representatives::text", "krs_representatives", "KRS representatives JSON", 4),
-        new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20),
-        new CompanyColumn("phone", "phone", "phone", "Phone number", 3),
-        new CompanyColumn("phoneMobile", "phone_mobile", "phone_mobile", "Mobile phone numbers", 3),
-        new CompanyColumn("phoneLandline", "phone_landline", "phone_landline", "Landline phone numbers", 3),
+        new CompanyColumn("phone", "phone", "phone", "Normalized phone list", 3),
+        new CompanyColumn("phoneMobile", "phone_mobile", "phone_mobile", "Normalized mobile phone numbers", 3),
+        new CompanyColumn("phoneLandline", "phone_landline", "phone_landline", "Normalized landline phone numbers", 3),
         new CompanyColumn("phonesJson", "phones_json::text", "phones_json", "Structured phone numbers JSON", 4),
         new CompanyColumn("email", "email", "email", "Email address", 3),
         new CompanyColumn("website", "website", "website", "Website", 3),
+        new CompanyColumn("electronicDeliveryAddress", "electronic_delivery_address", "electronic_delivery_address", "Electronic delivery address", 3),
+        new CompanyColumn("otherContactForm", "other_contact_form", "other_contact_form", "Other contact form", 3),
         new CompanyColumn("pkdCodes", "pkd_codes::text", "pkd_codes", "All PKD codes as JSON", 4),
-        new CompanyColumn("rawDetailPayload", "raw_detail_payload::text", "raw_detail_payload", "Full raw CEIDG detail JSON", 20)
+        new CompanyColumn("citizenships", "citizenships::text", "citizenships", "Citizenships JSON", 4),
+        new CompanyColumn("correspondenceAddress", "correspondence_address::text", "correspondence_address", "Correspondence address JSON", 4),
+        new CompanyColumn("additionalBusinessAddresses", "additional_business_addresses::text", "additional_business_addresses", "Additional business addresses JSON", 4),
+        new CompanyColumn("permissions", "permissions::text", "permissions", "Permissions JSON", 4),
+        new CompanyColumn("restrictions", "restrictions::text", "restrictions", "Restrictions JSON", 4),
+        new CompanyColumn("sourceIndexUrl", "source_index_url", "source_index_url", "Source index URL", 1),
+        new CompanyColumn("sourceDetailUrl", "source_detail_url", "source_detail_url", "Source detail URL", 1),
+        new CompanyColumn("firstSeenAtUtc", "first_seen_at_utc", "first_seen_at_utc", "First seen timestamp", 1),
+        new CompanyColumn("updatedAtUtc", "updated_at_utc", "updated_at_utc", "Last local update timestamp", 1),
+        new CompanyColumn("rawIndexPayload", "raw_index_payload::text", "raw_index_payload", "Full raw CEIDG index JSON", 20),
+        new CompanyColumn("rawDetailPayload", "raw_detail_payload::text", "raw_detail_payload", "Full raw CEIDG detail JSON", 20),
+        new CompanyColumn("rawKrsPayload", "raw_krs_payload::text", "raw_krs_payload", "Full raw KRS JSON", 20)
     };
 
     private static readonly IReadOnlyDictionary<string, CompanyColumn> ByName = Columns.ToDictionary(c => c.ApiName, StringComparer.OrdinalIgnoreCase);
-    private static readonly string[] DefaultColumns = { "ceidgId", "nip", "regon", "name", "status", "legalForm", "city", "mainPkdCode" };
+    private static readonly string[] DefaultColumns = { "ceidgId", "nip", "regon", "name", "status", "legalForm", "country", "city", "mainPkdCode", "registrySources" };
+
 
     public static IReadOnlyList<CompanyColumn> Resolve(string? columns)
     {
@@ -945,7 +1010,7 @@ public static class CompanyColumnCatalog
 
 public static class TokenPricing
 {
-    private static readonly string[] ContactColumns = { "phone", "phoneMobile", "phoneLandline", "phonesJson", "email", "website" };
+    private static readonly string[] ContactColumns = { "phone", "phoneMobile", "phoneLandline", "phonesJson", "email", "website", "electronicDeliveryAddress", "otherContactForm" };
 
     public static long CalculateCost(IReadOnlyList<CompanyColumn> columns, int returnedRows)
     {
@@ -963,7 +1028,7 @@ public static class TokenPricing
             rowCost += 1;
         }
 
-        if (selected.Contains("rawDetailPayload"))
+        if (selected.Contains("rawIndexPayload") || selected.Contains("rawDetailPayload") || selected.Contains("rawKrsPayload"))
         {
             rowCost += 10;
         }

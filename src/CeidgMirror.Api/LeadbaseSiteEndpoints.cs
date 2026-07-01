@@ -16,7 +16,7 @@ public static class LeadbaseSiteEndpoints
         app.MapGet("/docs", () => Results.Redirect("/swagger"))
             .ExcludeFromDescription();
 
-        app.MapGet("/app", async (HttpContext context, ProductApiStore store, CancellationToken cancellationToken) =>
+        app.MapGet("/app", async (HttpContext context, ProductApiStore store, ProductOperationsStore operationsStore, CancellationToken cancellationToken) =>
         {
             var userId = GetSignedInUserId(context);
             if (userId is null)
@@ -25,9 +25,11 @@ public static class LeadbaseSiteEndpoints
             }
 
             var account = await store.GetAccountPanelAsync(userId.Value, cancellationToken);
+            var quality = await operationsStore.GetDataQualityReportAsync(cancellationToken);
+            var imports = await operationsStore.GetImportMetricsAsync(cancellationToken);
             return account is null
                 ? Results.Redirect("/login")
-                : Results.Content(RenderAppHtml(account), "text/html; charset=utf-8");
+                : Results.Content(RenderAppHtml(account, quality, imports), "text/html; charset=utf-8");
         })
         .ExcludeFromDescription();
 
@@ -116,7 +118,7 @@ public static class LeadbaseSiteEndpoints
         return Guid.TryParse(value, out var userId) ? userId : null;
     }
 
-    private static string RenderAppHtml(AccountPanel account) => $"""
+    private static string RenderAppHtml(AccountPanel account, DataQualityReportResponse quality, ImportMetricsResponse imports) => $"""
 <!doctype html>
 <html lang="pl">
 <head>
@@ -143,7 +145,7 @@ public static class LeadbaseSiteEndpoints
       <article><span>Zapytania API</span><b>{account.QueryCount}</b></article>
     </section>
     <section class="dashboard-frame real-app-frame">
-      <aside><strong>leadbase</strong><a href="#summary">Podsumowanie</a><a href="#api-keys">Klucze API</a><a href="#tokens">Tokeny</a><a href="#usage">Historia użycia</a><a href="/swagger">Swagger</a></aside>
+      <aside><strong>leadbase</strong><a href="#summary">Podsumowanie</a><a href="#api-keys">Klucze API</a><a href="#tokens">Tokeny</a><a href="#usage">Historia użycia</a><a href="#data-quality">Jakość danych</a><a href="#imports">Importy</a><a href="/swagger">Swagger</a></aside>
       <div class="dash-main account-dashboard">
         <section class="panel-section" id="api-keys">
           <div class="panel-section-head"><div><h2>Klucze API</h2><p>Pełny klucz pokazujemy tylko raz po utworzeniu. W bazie przechowujemy hash oraz prefiks.</p></div></div>
@@ -161,6 +163,14 @@ public static class LeadbaseSiteEndpoints
         <section class="panel-section" id="usage">
           <div class="panel-section-head"><div><h2>Historia użycia API</h2><p>Ostatnie zapytania z kosztem tokenowym i wybranymi kolumnami. Starsze wpisy zachowują koszt naliczony według cennika obowiązującego w momencie zapytania.</p></div></div>
           {RenderQueryLogs(account.QueryLogs)}
+        </section>
+        <section class="panel-section" id="data-quality">
+          <div class="panel-section-head"><div><h2>Jakość danych</h2><p>Raport kontrolny dla aktualnej tabeli firm po standaryzacji CEIDG/KRS.</p></div><a class="button button-ghost" href="/swagger/index.html#/Operations/get_operations_data_quality">Swagger</a></div>
+          {RenderDataQuality(quality)}
+        </section>
+        <section class="panel-section" id="imports">
+          <div class="panel-section-head"><div><h2>Importy CEIDG/KRS</h2><p>Ostatni postęp, throughput i błędy workerów pobierających dane źródłowe.</p></div><a class="button button-ghost" href="/swagger/index.html#/Operations/get_operations_import_metrics">Swagger</a></div>
+          {RenderImportMetrics(imports)}
         </section>
       </div>
     </section>
@@ -287,6 +297,61 @@ public static class LeadbaseSiteEndpoints
 """;
     }
 
+
+
+    private static string RenderDataQuality(DataQualityReportResponse quality)
+    {
+        var qualityCards = new[]
+        {
+            ("Firmy w bazie", quality.TotalCompanies.ToString("N0")),
+            ("Puste NIP", quality.Identity.MissingNip.ToString("N0")),
+            ("Puste REGON", quality.Identity.MissingRegon.ToString("N0")),
+            ("Błędne kraje", quality.Address.InvalidCountryRows.ToString("N0")),
+            ("Ulice z prefiksem", quality.Address.StreetWithPrefixRows.ToString("N0")),
+            ("Błędne telefony", quality.Contact.InvalidPhoneRows.ToString("N0")),
+            ("Duplikaty NIP", quality.Duplicates.DuplicateNipGroups.ToString("N0")),
+            ("Duplikaty KRS", quality.Duplicates.DuplicateKrsGroups.ToString("N0"))
+        };
+
+        return $"""
+          <div class="quality-grid">
+            {string.Join(string.Empty, qualityCards.Select(card => $"<article><span>{Html(card.Item1)}</span><b>{Html(card.Item2)}</b></article>"))}
+          </div>
+          <div class="quality-details">
+            <div><strong>Kontakt</strong><span>Brak telefonu: {quality.Contact.MissingPhoneRows:N0}</span><span>Brak email: {quality.Contact.MissingEmailRows:N0}</span><span>Brak WWW: {quality.Contact.MissingWebsiteRows:N0}</span></div>
+            <div><strong>Identyfikatory</strong><span>Brak NIP i REGON: {quality.Identity.MissingNipAndRegon:N0}</span><span>Duplikowane REGON: {quality.Duplicates.DuplicateRegonGroups:N0} grup / {quality.Duplicates.DuplicateRegonRows:N0} wierszy</span></div>
+            <div><strong>Wygenerowano</strong><span>{FormatDate(quality.GeneratedAtUtc)}</span></div>
+          </div>
+""";
+    }
+
+    private static string RenderImportMetrics(ImportMetricsResponse imports)
+    {
+        if (imports.Sources.Count == 0)
+        {
+            return """<div class="empty-state">Brak zapisanych importów CEIDG/KRS.</div>""";
+        }
+
+        return """
+          <div class="import-card-list">
+""" + string.Join(string.Empty, imports.Sources.Select(source => $"""
+            <article class="import-card">
+              <div><strong>{Html(source.ImportKind)}</strong><span class="{ImportStatusClass(source.LastRunStatus)}">{Html(source.LastRunStatus ?? "brak")}</span></div>
+              <dl>
+                <dt>Ostatni sukces</dt><dd>{FormatDate(source.LastCompletedRunFinishedAtUtc)}</dd>
+                <dt>Ostatni checkpoint</dt><dd>{FormatDate(source.LastCheckpointAtUtc)}</dd>
+                <dt>Zaimportowane</dt><dd>{source.ImportedFromCheckpoints:N0}</dd>
+                <dt>Pominięte</dt><dd>{source.SkippedFromCheckpoints:N0}</dd>
+                <dt>Błędy 24h</dt><dd>{source.FailedRuns24h:N0}</dd>
+                <dt>Rekordy/min</dt><dd>{FormatDecimal(source.LastRunRecordsPerMinute)}</dd>
+              </dl>
+            </article>
+""")) + $"""
+          </div>
+          <p class="panel-footnote">Raport wygenerowano: {FormatDate(imports.GeneratedAtUtc)}. Endpointy operacyjne nie pobierają tokenów.</p>
+""";
+    }
+
     private static string RenderLedgerApiKey(AccountLedgerEntry entry)
     {
         if (string.IsNullOrWhiteSpace(entry.ApiKeyPrefix))
@@ -299,6 +364,8 @@ public static class LeadbaseSiteEndpoints
     }
 
     private static string FormatDate(DateTimeOffset? value) => value is null ? "-" : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    private static string FormatDecimal(decimal? value) => value is null ? "-" : value.Value.ToString("N2");
+    private static string ImportStatusClass(string? status) => status?.Equals("completed", StringComparison.OrdinalIgnoreCase) == true ? "status-pill status-active" : "status-pill status-revoked";
     private static string ReasonLabel(string reason) => reason switch
     {
         "registration_grant" => "Pakiet startowy",
@@ -335,7 +402,7 @@ public static class LeadbaseSiteEndpoints
 
     private static string[] ResolveDemoColumns(string? columns)
     {
-        var allowed = new[] { "ceidgId", "nip", "regon", "name", "status", "ownerFirstName", "ownerLastName", "city", "voivodeship", "street", "postalCode", "mainPkdCode", "pkdCodes" };
+        var allowed = new[] { "ceidgId", "nip", "regon", "name", "status", "legalForm", "registeredOn", "registrySources", "krsNumber", "ownerFirstName", "ownerLastName", "country", "city", "voivodeship", "county", "municipality", "street", "building", "unit", "postalCode", "mainPkdCode", "pkdCodes", "phone", "phoneMobile", "phoneLandline", "phonesJson", "email", "website" };
         if (string.IsNullOrWhiteSpace(columns))
         {
             return allowed;
@@ -360,14 +427,29 @@ public static class LeadbaseSiteEndpoints
                 "regon" => row.Regon,
                 "name" => row.Name,
                 "status" => row.Status,
+                "legalform" => row.LegalForm,
+                "registeredon" => row.RegisteredOn,
+                "registrysources" => row.RegistrySources,
+                "krsnumber" => row.KrsNumber,
                 "ownerfirstname" => row.OwnerFirstName,
                 "ownerlastname" => row.OwnerLastName,
+                "country" => row.Country,
                 "city" => row.City,
                 "voivodeship" => row.Voivodeship,
+                "county" => row.County,
+                "municipality" => row.Municipality,
                 "street" => row.Street,
+                "building" => row.Building,
+                "unit" => row.Unit,
                 "postalcode" => row.PostalCode,
                 "mainpkdcode" => row.MainPkdCode,
                 "pkdcodes" => row.PkdCodes,
+                "phone" => row.Phone,
+                "phonemobile" => row.PhoneMobile,
+                "phonelandline" => row.PhoneLandline,
+                "phonesjson" => row.PhonesJson,
+                "email" => row.Email,
+                "website" => row.Website,
                 _ => null
             };
         }
@@ -377,14 +459,14 @@ public static class LeadbaseSiteEndpoints
 
     private static readonly DemoCompany[] DemoCompanies =
     [
-        new("b18d8d43-4e20-49c0-8e21-000000000001", "7312045678", "141234567", "FIRMA ABC JAN KOWALSKI", "Aktywny", "Jan", "Kowalski", "Warszawa", "mazowieckie", "Marszalkowska 10", "00-590", "62.01.Z", "[\"62.01.Z\",\"62.02.Z\"]"),
-        new("b18d8d43-4e20-49c0-8e21-000000000002", "9491832736", "122334455", "PV SOLUTIONS SPOLKA Z O.O.", "Aktywny", "Anna", "Nowak", "Krakow", "malopolskie", "Dluga 8", "31-146", "43.21.Z", "[\"43.21.Z\",\"35.11.Z\"]"),
-        new("b18d8d43-4e20-49c0-8e21-000000000003", "8762459076", "987654321", "SUN ENERGY S.C.", "Aktywny", "Piotr", "Zielinski", "Gdansk", "pomorskie", "Grunwaldzka 22", "80-236", "43.21.Z", "[\"43.21.Z\"]"),
-        new("b18d8d43-4e20-49c0-8e21-000000000004", "5223001189", "556677889", "EKO INSTALACJE DARIUSZ NOWAK", "Zawieszony", "Dariusz", "Nowak", "Poznan", "wielkopolskie", "Polna 5", "60-535", "43.21.Z", "[\"43.21.Z\",\"71.12.Z\"]"),
-        new("b18d8d43-4e20-49c0-8e21-000000000005", "1132894410", "101202303", "SOFTWARE LAB ANNA WISNIEWSKA", "Aktywny", "Anna", "Wisniewska", "Warszawa", "mazowieckie", "Prosta 51", "00-838", "62.02.Z", "[\"62.02.Z\",\"63.11.Z\"]")
+        new("b18d8d43-4e20-49c0-8e21-000000000001", "7312045678", "141234567", "Firma ABC Jan Kowalski", "Aktywny", "Jednoosobowa działalność gospodarcza", "2018-03-14", "[\"CEIDG\"]", null, "Jan", "Kowalski", "PL", "Warszawa", "MAZOWIECKIE", "Warszawa", "Warszawa", "Marszałkowska", "10", null, "00-590", "62.01.Z", "[\"62.01.Z\",\"62.02.Z\"]", "+48600111222", "+48600111222", null, "[{\"type\":\"mobile\",\"value\":\"+48600111222\"}]", null, null),
+        new("b18d8d43-4e20-49c0-8e21-000000000002", "9491832736", "122334455", "PV Solutions Sp. z o.o.", "Aktywny", "Spółka z ograniczoną odpowiedzialnością", "2020-09-02", "[\"KRS\"]", "0000123456", null, null, "PL", "Kraków", "MAŁOPOLSKIE", "Kraków", "Kraków", "Długa", "8", "4", "31-146", "43.21.Z", "[\"43.21.Z\",\"35.11.Z\"]", "+48 12 345 67 89", null, "+48 12 345 67 89", "[{\"type\":\"landline\",\"value\":\"+48 12 345 67 89\"}]", null, null),
+        new("b18d8d43-4e20-49c0-8e21-000000000003", "8762459076", "987654321", "Sun Energy S.C.", "Aktywny", "Spółka cywilna", "2019-06-10", "[\"CEIDG\"]", null, "Piotr", "Zieliński", "PL", "Gdańsk", "POMORSKIE", "Gdańsk", "Gdańsk", "Grunwaldzka", "22", null, "80-236", "43.21.Z", "[\"43.21.Z\"]", null, null, null, "[]", null, null),
+        new("b18d8d43-4e20-49c0-8e21-000000000004", "5223001189", "556677889", "Eko Instalacje Dariusz Nowak", "Zawieszony", "Jednoosobowa działalność gospodarcza", "2015-11-27", "[\"CEIDG\"]", null, "Dariusz", "Nowak", "PL", "Poznań", "WIELKOPOLSKIE", "Poznań", "Poznań", "Polna", "5", null, "60-535", "43.21.Z", "[\"43.21.Z\",\"71.12.Z\"]", "+48555111222, +48 61 223 45 67", "+48555111222", "+48 61 223 45 67", "[{\"type\":\"mobile\",\"value\":\"+48555111222\"},{\"type\":\"landline\",\"value\":\"+48 61 223 45 67\"}]", null, null),
+        new("b18d8d43-4e20-49c0-8e21-000000000005", "1132894410", "101202303", "Software Lab Anna Wiśniewska", "Aktywny", "Jednoosobowa działalność gospodarcza", "2021-01-08", "[\"CEIDG\"]", null, "Anna", "Wiśniewska", "PL", "Warszawa", "MAZOWIECKIE", "Warszawa", "Warszawa", "Prosta", "51", null, "00-838", "62.02.Z", "[\"62.02.Z\",\"63.11.Z\"]", null, null, null, "[]", null, null)
     ];
 
-    private sealed record DemoCompany(string CeidgId, string Nip, string Regon, string Name, string Status, string OwnerFirstName, string OwnerLastName, string City, string Voivodeship, string Street, string PostalCode, string MainPkdCode, string PkdCodes);
+    private sealed record DemoCompany(string CeidgId, string Nip, string Regon, string Name, string Status, string LegalForm, string RegisteredOn, string RegistrySources, string? KrsNumber, string? OwnerFirstName, string? OwnerLastName, string Country, string City, string Voivodeship, string County, string Municipality, string Street, string Building, string? Unit, string PostalCode, string MainPkdCode, string PkdCodes, string? Phone, string? PhoneMobile, string? PhoneLandline, string PhonesJson, string? Email, string? Website);
     private const string HomeHtml = """
 <!doctype html>
 <html lang="pl">
@@ -481,14 +563,26 @@ public static class LeadbaseSiteEndpoints
             <label><input type="checkbox" name="columns" value="regon"> REGON</label>
             <label><input type="checkbox" name="columns" value="name" checked> Nazwa</label>
             <label><input type="checkbox" name="columns" value="status" checked> Status</label>
+            <label><input type="checkbox" name="columns" value="legalForm"> Forma prawna</label>
+            <label><input type="checkbox" name="columns" value="registeredOn"> Data rejestracji</label>
+            <label><input type="checkbox" name="columns" value="registrySources"> Źródła</label>
+            <label><input type="checkbox" name="columns" value="krsNumber"> KRS</label>
             <label><input type="checkbox" name="columns" value="ownerFirstName"> Imię właściciela</label>
             <label><input type="checkbox" name="columns" value="ownerLastName"> Nazwisko właściciela</label>
+            <label><input type="checkbox" name="columns" value="country"> Kraj</label>
             <label><input type="checkbox" name="columns" value="city" checked> Miasto</label>
             <label><input type="checkbox" name="columns" value="voivodeship"> Województwo</label>
+            <label><input type="checkbox" name="columns" value="county"> Powiat</label>
+            <label><input type="checkbox" name="columns" value="municipality"> Gmina</label>
             <label><input type="checkbox" name="columns" value="street"> Ulica</label>
+            <label><input type="checkbox" name="columns" value="building"> Budynek</label>
+            <label><input type="checkbox" name="columns" value="unit"> Lokal</label>
             <label><input type="checkbox" name="columns" value="postalCode"> Kod pocztowy</label>
             <label><input type="checkbox" name="columns" value="mainPkdCode" checked> Główne PKD</label>
             <label><input type="checkbox" name="columns" value="pkdCodes"> Wszystkie PKD</label>
+            <label><input type="checkbox" name="columns" value="phoneMobile"> Telefon komórkowy</label>
+            <label><input type="checkbox" name="columns" value="phoneLandline"> Telefon stacjonarny</label>
+            <label><input type="checkbox" name="columns" value="phonesJson"> Telefony JSON</label>
           </fieldset>
           <button class="button button-primary button-large" type="submit">Testuj endpoint</button>
           <p class="lab-note" id="demo-counter">Demo: 2 darmowe zapytania bez konta.</p>
