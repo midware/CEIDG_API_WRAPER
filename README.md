@@ -111,7 +111,7 @@ KRS pacing defaults:
 - Smooth interval: `KrsImport__MinimumRequestIntervalSeconds=2`.
 - Transient PRS/KRS responses (`429`, `408`, `502`, `503`, `504`) retry the same KRS number with exponential backoff and respect `Retry-After` when the API sends it.
 
-For a full KRS bootstrap, use `KrsImport__Source=Bulletin` and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`. If CEIDG and KRS imports are both enabled, the worker runs them in separate loops so one source does not block the other. In the console you should see both `CEIDG` messages and `KRS bulletin` / `KRS import started` messages.
+For a full KRS bootstrap, use `KrsImport__Source=Bulletin` and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`. If CEIDG and KRS imports are both enabled, the worker runs them in separate loops so one source does not block the other. Bulletin imports are streamed day by day: the worker downloads one daily bulletin, immediately fetches current KRS excerpts for that day, writes rows to `ceidg.company_records`, saves a per-day checkpoint, and only then moves to the next bulletin day. In the console you should see both `CEIDG` messages and `KRS bulletin ... Importing current excerpts now` / `Imported KRS ...` messages.
 
 ## API Locally
 
