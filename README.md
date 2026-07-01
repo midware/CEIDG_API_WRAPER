@@ -66,10 +66,14 @@ $env:Import__ChangesWindowDays = "1"
 $env:Import__MaxPages = "0"
 $env:Import__PageLimit = "50"
 $env:Import__MaxCompanies = "0"
+$env:KrsImport__Enabled = "true"
+$env:KrsImport__Source = "Bulletin"
+$env:KrsImport__StartDate = "2022-03-08"
+$env:KrsImport__MaxItems = "0"
 dotnet run --project src\CeidgMirror.Worker\CeidgMirror.Worker.csproj
 ```
 
-The worker is resumable. Progress is persisted in `source.import_checkpoint` after each processed company. Keep `MaxPages=0` and `MaxCompanies=0` for a full mirror.
+The worker is resumable. Progress is persisted in `source.import_checkpoint` after each processed CEIDG company and each processed KRS number. Keep `MaxPages=0` and `MaxCompanies=0` for a full CEIDG mirror. Keep `KrsImport__MaxItems=0` for an unlimited KRS pass.
 
 Imported CEIDG/KRS profile fields are normalized before writing to PostgreSQL: person/place/street casing, canonical voivodeship names, ISO-2 country codes, compact NIP/REGON/KRS/PKD values, lowercase email/website values, street names without a leading `ul.` prefix, and comma-separated Polish phone numbers: mobile as `+48xxxxxxxxx`, landline as `+48 XX XXX XX XX`, plus structured `phone_mobile`, `phone_landline`, and `phones_json` columns. Raw registry payloads remain unchanged in `raw_detail_payload` / `raw_krs_payload` for audit and future reprocessing.
 
@@ -107,7 +111,7 @@ KRS pacing defaults:
 - Smooth interval: `KrsImport__MinimumRequestIntervalSeconds=2`.
 - Transient PRS/KRS responses (`429`, `408`, `502`, `503`, `504`) retry the same KRS number with exponential backoff and respect `Retry-After` when the API sends it.
 
-For a full KRS bootstrap, start with a controlled seed or daily bulletin window and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`. If CEIDG and KRS imports are both enabled, the worker runs them in separate loops so one source does not block the other.
+For a full KRS bootstrap, use `KrsImport__Source=Bulletin` and keep `KrsImport__Resume=true`; progress is persisted in `source.import_checkpoint`. If CEIDG and KRS imports are both enabled, the worker runs them in separate loops so one source does not block the other. In the console you should see both `CEIDG` messages and `KRS bulletin` / `KRS import started` messages.
 
 ## API Locally
 

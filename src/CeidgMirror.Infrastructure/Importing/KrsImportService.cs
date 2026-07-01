@@ -157,32 +157,41 @@ public sealed class KrsImportService(
     {
         if (string.Equals(options.Source, "SeededNumbers", StringComparison.OrdinalIgnoreCase))
         {
-            return options.SeedKrsNumbers
+            var seeded = options.SeedKrsNumbers
                 .Select(NormalizeKrsNumber)
                 .Where(number => !string.IsNullOrWhiteSpace(number))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(number => number, StringComparer.Ordinal)
                 .ToArray();
+
+            logger.LogInformation("KRS seeded source resolved {Count} numbers.", seeded.Length);
+            return seeded;
         }
 
         if (string.Equals(options.Source, "Bulletin", StringComparison.OrdinalIgnoreCase))
         {
             var endDate = options.EndDate ?? DateOnly.FromDateTime(DateTime.UtcNow.Date);
             var numbers = new SortedSet<string>(StringComparer.Ordinal);
+            logger.LogInformation("Resolving KRS numbers from bulletin window {StartDate:yyyy-MM-dd}..{EndDate:yyyy-MM-dd}.", options.StartDate, endDate);
             for (var day = options.StartDate; day <= endDate; day = day.AddDays(1))
             {
+                logger.LogInformation("Requesting KRS bulletin for {Day:yyyy-MM-dd}.", day);
                 var response = await client.GetBulletinAsync(day, options.DayFormat, cancellationToken);
                 if (!IsSuccess(response.StatusCode))
                 {
                     throw new InvalidOperationException($"KRS bulletin for {day:yyyy-MM-dd} failed with status {(int)response.StatusCode}. Body: {Truncate(response.Content, 500)}");
                 }
 
+                var before = numbers.Count;
                 foreach (var number in KrsBulletinParser.ParseKrsNumbers(response.Content))
                 {
                     numbers.Add(number);
                 }
+
+                logger.LogInformation("KRS bulletin {Day:yyyy-MM-dd} resolved {NewCount} new numbers. Total unique={TotalCount}.", day, numbers.Count - before, numbers.Count);
             }
 
+            logger.LogInformation("KRS bulletin source resolved {Count} unique numbers.", numbers.Count);
             return numbers.ToArray();
         }
 
