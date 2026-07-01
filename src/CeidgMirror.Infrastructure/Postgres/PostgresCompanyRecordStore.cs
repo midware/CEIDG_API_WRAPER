@@ -441,6 +441,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                     nip = coalesce(nullif(nip, ''), $16),
                     regon = coalesce(nullif(regon, ''), $17),
                     name = coalesce(nullif(name, ''), $18),
+                    status = coalesce(nullif(status, ''), $19),
                     updated_at_utc = now()
                 where id = $1
                 """, connection, transaction);
@@ -469,6 +470,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 nip,
                 regon,
                 name,
+                status,
                 krs_number,
                 krs_register_type,
                 krs_legal_form,
@@ -484,7 +486,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17::jsonb, $18, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
@@ -496,6 +498,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             Add(insert, record.Nip);
             Add(insert, record.Regon);
             Add(insert, record.Name);
+            Add(insert, MapKrsStatusToCanonical(record.Status));
             Add(insert, record.KrsNumber);
             Add(insert, record.RegisterType);
             Add(insert, record.LegalForm);
@@ -531,7 +534,16 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.Nip);
         Add(command, record.Regon);
         Add(command, record.Name);
+        Add(command, MapKrsStatusToCanonical(record.Status));
     }
+
+    private static string? MapKrsStatusToCanonical(string? krsStatus) =>
+        krsStatus?.Trim() switch
+        {
+            "1" => "AKTYWNY",
+            "2" => "WYKRESLONY",
+            _ => null
+        };
 
     public async Task UpsertReportPayloadAsync(
         CeidgReportDescriptor report,

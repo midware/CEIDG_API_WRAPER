@@ -46,12 +46,22 @@ public static partial class KrsBulletinParser
             return;
         }
 
-        foreach (Match match in KrsNumberRegex().Matches(value))
+        var trimmed = value.Trim();
+        if (ShortKrsNumberRegex().IsMatch(trimmed))
+        {
+            results.Add(trimmed.PadLeft(10, '0'));
+            return;
+        }
+
+        foreach (Match match in LongKrsNumberRegex().Matches(value))
         {
             results.Add(match.Value.PadLeft(10, '0'));
         }
     }
 
+    [GeneratedRegex(@"^\d{1,10}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ShortKrsNumberRegex();
+
     [GeneratedRegex(@"(?<!\d)\d{10}(?!\d)", RegexOptions.CultureInvariant)]
-    private static partial Regex KrsNumberRegex();
+    private static partial Regex LongKrsNumberRegex();
 }

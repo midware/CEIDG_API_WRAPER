@@ -63,12 +63,12 @@ public sealed class KrsParserTests
         [
           "Zmiana wpisu KRS 0000120353",
           { "opis": "Podmiot 0000335477 oraz duplikat 0000120353" },
-          123
+          "1538"
         ]
         """;
 
         var numbers = KrsBulletinParser.ParseKrsNumbers(json);
 
-        Assert.Equal(new[] { "0000120353", "0000335477" }, numbers);
+        Assert.Equal(new[] { "0000001538", "0000120353", "0000335477" }, numbers);
     }
 }

@@ -81,7 +81,7 @@ Request pacing:
 
 KRS data is stored in the same `ceidg.company_records` table. Existing CEIDG rows are matched by KRS, NIP or REGON; if no row exists, the worker creates a KRS-only company row with `registry_sources={KRS}`.
 
-Official PRS OpenAPI base URL is read from the public PRS configuration as `https://api-krs.ms.gov.pl/`. The worker currently supports:
+Official PRS OpenAPI base URL is read from the public PRS configuration as `https://api-krs.ms.gov.pl/`. The PRS page says the bulletin day must be later than `2021-12-08`, but live checks returned `400 Bad Request` until `2022-03-08`; use `2022-03-08` as the practical bootstrap start unless PRS restores older bulletins. The worker currently supports:
 
 - `SeededNumbers` - import specific KRS numbers from `KrsImport__SeedKrsNumbers`.
 - `Bulletin` - read `api/Krs/Biuletyn/{dzien}`, extract KRS numbers, then fetch current excerpts.

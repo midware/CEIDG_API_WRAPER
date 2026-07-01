@@ -9,7 +9,7 @@ public sealed class KrsImportOptions
     public Uri BaseUrl { get; init; } = new("https://api-krs.ms.gov.pl/");
     public string Register { get; init; } = "P";
     public string DayFormat { get; init; } = "yyyy-MM-dd";
-    public DateOnly StartDate { get; init; } = new(2021, 12, 9);
+    public DateOnly StartDate { get; init; } = new(2022, 3, 8);
     public DateOnly? EndDate { get; init; }
     public bool Resume { get; init; } = true;
     public int MaxItems { get; init; } = 0;

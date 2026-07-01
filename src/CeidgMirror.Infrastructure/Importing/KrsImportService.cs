@@ -76,6 +76,11 @@ public sealed class KrsImportService(
                             (int)response.StatusCode,
                             Truncate(response.Content, 500));
                     }
+                    else if (string.IsNullOrWhiteSpace(response.Content))
+                    {
+                        failed++;
+                        logger.LogWarning("KRS {KrsNumber} returned an empty response body.", krsNumber);
+                    }
                     else
                     {
                         var record = KrsCurrentExcerptParser.Parse(response);
