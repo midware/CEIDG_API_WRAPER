@@ -442,6 +442,19 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                     regon = coalesce(nullif(regon, ''), $17),
                     name = coalesce(nullif(name, ''), $18),
                     status = coalesce(nullif(status, ''), $19),
+                    legal_form = coalesce($20, legal_form),
+                    registered_on = coalesce($21, registered_on),
+                    business_address_country = coalesce($22, nullif(business_address_country, '')),
+                    business_address_voivodeship = coalesce($23, nullif(business_address_voivodeship, '')),
+                    business_address_county = coalesce($24, nullif(business_address_county, '')),
+                    business_address_municipality = coalesce($25, nullif(business_address_municipality, '')),
+                    business_address_city = coalesce($26, nullif(business_address_city, '')),
+                    business_address_street = coalesce($27, nullif(business_address_street, '')),
+                    business_address_building = coalesce($28, nullif(business_address_building, '')),
+                    business_address_unit = coalesce($29, nullif(business_address_unit, '')),
+                    business_address_postal_code = coalesce($30, nullif(business_address_postal_code, '')),
+                    main_pkd_code = coalesce($31, nullif(main_pkd_code, '')),
+                    pkd_codes = coalesce($32::jsonb, pkd_codes),
                     updated_at_utc = now()
                 where id = $1
                 """, connection, transaction);
@@ -481,12 +494,26 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
                 krs_address,
                 krs_representatives,
                 krs_updated_at_utc,
+                legal_form,
+                registered_on,
+                business_address_country,
+                business_address_voivodeship,
+                business_address_county,
+                business_address_municipality,
+                business_address_city,
+                business_address_street,
+                business_address_building,
+                business_address_unit,
+                business_address_postal_code,
+                main_pkd_code,
+                pkd_codes,
                 extraction_version,
                 extraction_warnings
             )
             values (
                 $1, null, null, $2, null, $3, now(), now(), $4, array['KRS']::text[], null, null, $5::jsonb,
-                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19, 1, '[]'::jsonb
+                $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19,
+                $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32::jsonb, 1, '[]'::jsonb
             )
             """, connection, transaction))
         {
@@ -509,6 +536,7 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
             AddJson(insert, record.AddressJson);
             AddJson(insert, record.RepresentativesJson);
             Add(insert, record.FetchedAtUtc);
+            AddKrsUnifiedParameters(insert, record);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -535,8 +563,25 @@ public sealed class PostgresCompanyRecordStore(NpgsqlDataSource dataSource) : IC
         Add(command, record.Regon);
         Add(command, record.Name);
         Add(command, MapKrsStatusToCanonical(record.Status));
+        AddKrsUnifiedParameters(command, record);
     }
 
+    private static void AddKrsUnifiedParameters(NpgsqlCommand command, KrsCompanyRecord record)
+    {
+        Add(command, record.LegalForm);
+        Add(command, record.RegistrationDate);
+        Add(command, record.AddressCountry);
+        Add(command, record.AddressVoivodeship);
+        Add(command, record.AddressCounty);
+        Add(command, record.AddressMunicipality);
+        Add(command, record.AddressCity);
+        Add(command, record.AddressStreet);
+        Add(command, record.AddressBuilding);
+        Add(command, record.AddressUnit);
+        Add(command, record.AddressPostalCode);
+        Add(command, record.MainPkdCode);
+        AddJson(command, record.PkdCodesJson);
+    }
     private static string? MapKrsStatusToCanonical(string? krsStatus) =>
         krsStatus?.Trim() switch
         {

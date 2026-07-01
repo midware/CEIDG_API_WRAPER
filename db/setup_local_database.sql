@@ -60,6 +60,8 @@ create table if not exists ceidg.company_records (
     regon text null,
     name text null,
     status text null,
+    legal_form text null,
+    registered_on date null,
     status_number integer null,
     phone text null,
     email text null,
@@ -130,6 +132,8 @@ create index if not exists ix_company_records_regon on ceidg.company_records (re
 create index if not exists ix_company_records_owner_nip on ceidg.company_records (owner_nip);
 create index if not exists ix_company_records_owner_regon on ceidg.company_records (owner_regon);
 create index if not exists ix_company_records_status on ceidg.company_records (status);
+create index if not exists ix_company_records_legal_form on ceidg.company_records (legal_form);
+create index if not exists ix_company_records_registered_on on ceidg.company_records (registered_on);
 create index if not exists ix_company_records_main_pkd_code on ceidg.company_records (main_pkd_code);
 create index if not exists ix_company_records_city on ceidg.company_records (business_address_city);
 create index if not exists ix_company_records_voivodeship on ceidg.company_records (business_address_voivodeship);
@@ -263,4 +267,3 @@ create table if not exists app.api_query_log (
 
 create index if not exists ix_api_query_log_user_created on app.api_query_log(user_id, created_at_utc desc);
 create index if not exists ix_api_query_log_api_key_created on app.api_query_log(api_key_id, created_at_utc desc);
-

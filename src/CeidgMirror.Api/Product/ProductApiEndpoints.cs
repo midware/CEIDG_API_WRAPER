@@ -868,6 +868,8 @@ public static class CompanyColumnCatalog
         new CompanyColumn("regon", "regon", "regon", "REGON number", 1),
         new CompanyColumn("name", "name", "name", "Business name", 1),
         new CompanyColumn("status", "status", "status", "Business status", 1),
+        new CompanyColumn("legalForm", "legal_form", "legal_form", "Legal form", 1),
+        new CompanyColumn("registeredOn", "registered_on", "registered_on", "Registration/start date", 1),
         new CompanyColumn("ownerFirstName", "owner_first_name", "owner_first_name", "Owner first name", 1),
         new CompanyColumn("ownerLastName", "owner_last_name", "owner_last_name", "Owner last name", 1),
         new CompanyColumn("city", "business_address_city", "business_address_city", "Business city", 1),
@@ -894,7 +896,7 @@ public static class CompanyColumnCatalog
     };
 
     private static readonly IReadOnlyDictionary<string, CompanyColumn> ByName = Columns.ToDictionary(c => c.ApiName, StringComparer.OrdinalIgnoreCase);
-    private static readonly string[] DefaultColumns = { "ceidgId", "nip", "regon", "name", "status", "city", "mainPkdCode" };
+    private static readonly string[] DefaultColumns = { "ceidgId", "nip", "regon", "name", "status", "legalForm", "city", "mainPkdCode" };
 
     public static IReadOnlyList<CompanyColumn> Resolve(string? columns)
     {
@@ -991,4 +993,3 @@ public static class PasswordSecurity
 }
 
 public sealed class DuplicateEmailException : Exception;
-
