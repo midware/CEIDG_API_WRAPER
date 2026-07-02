@@ -36,7 +36,7 @@
     const params = new URLSearchParams();
     const columns = selectedColumns(data).join(',');
     if (columns) params.set('columns', columns);
-    ['name', 'city', 'mainPkdCode'].forEach((name) => {
+    ['name', 'country', 'city', 'mainPkdCode'].forEach((name) => {
       const value = String(data.get(name) || '').trim();
       if (value) params.set(name, value);
     });
@@ -115,8 +115,8 @@
 
   form.addEventListener('submit', runQuery);
   renderTable([
-    { nip: '7312045678', name: 'FIRMA ABC JAN KOWALSKI', city: 'Warszawa', pkd: '62.01.Z', status: 'Aktywny' },
-    { nip: '9491832736', name: 'PV SOLUTIONS SPOLKA Z O.O.', city: 'Krakow', pkd: '43.21.Z', status: 'Aktywny' }
+    { nip: '7312045678', name: 'FIRMA ABC JAN KOWALSKI', country: 'PL', city: 'Warszawa', pkd: '62.01.Z', status: 'Aktywny' },
+    { nip: '9491832736', name: 'PV SOLUTIONS SPOLKA Z O.O.', country: 'PL', city: 'Krakow', pkd: '43.21.Z', status: 'Aktywny' }
   ]);
   updateCounter();
 })();

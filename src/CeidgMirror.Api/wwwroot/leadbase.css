@@ -1560,3 +1560,131 @@ ul { padding-left: 18px; }
   align-items: center;
   min-height: 28px;
 }
+
+.marketing-dashboard-frame {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.marketing-dashboard-main {
+  padding: 24px;
+}
+
+.marketing-dashboard-main .metrics {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.marketing-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.marketing-panel-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.marketing-panel-wide {
+  grid-row: span 2;
+}
+
+.panel-mini-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.panel-mini-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-mini-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.panel-mini-head strong {
+  color: #b33b2e;
+  font-size: 20px;
+}
+
+.token-usage-chart {
+  min-height: 230px;
+  margin-top: 8px;
+  padding: 22px 20px 24px;
+  box-shadow: none;
+}
+
+.api-key-preview-row {
+  display: grid;
+  grid-template-columns: minmax(70px, .7fr) minmax(0, 1fr);
+  gap: 5px 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.api-key-preview-row:first-of-type {
+  border-top: 0;
+}
+
+.api-key-preview-row code {
+  justify-self: start;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #eef5f5;
+  color: #214147;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.api-key-preview-row span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.muted-row {
+  opacity: .78;
+}
+
+.ledger-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding-top: 4px;
+  font-size: 14px;
+}
+
+.ledger-preview span {
+  color: #405159;
+}
+
+@media (max-width: 1040px) {
+  .marketing-panel-grid,
+  .marketing-dashboard-main .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .marketing-panel-wide {
+    grid-row: auto;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .marketing-panel-grid,
+  .marketing-dashboard-main .metrics {
+    grid-template-columns: 1fr;
+  }
+}

@@ -62,7 +62,7 @@ public static class LeadbaseSiteEndpoints
         })
         .ExcludeFromDescription();
 
-        app.MapGet("/demo/companies", (HttpContext context, string? name, string? city, string? mainPkdCode, string? columns) =>
+        app.MapGet("/demo/companies", (HttpContext context, string? name, string? country, string? city, string? mainPkdCode, string? columns) =>
         {
             var key = GetAnonymousDemoKey(context);
             var used = AnonymousDemoUsage.AddOrUpdate(key, 1, (_, current) => current + 1);
@@ -74,6 +74,7 @@ public static class LeadbaseSiteEndpoints
             var selectedColumns = ResolveDemoColumns(columns);
             var rows = DemoCompanies.Where(company =>
                 Matches(company.Name, name) &&
+                Matches(company.Country, country) &&
                 Matches(company.City, city) &&
                 Matches(company.MainPkdCode, mainPkdCode)).Take(10).ToArray();
 
@@ -494,8 +495,8 @@ public static class LeadbaseSiteEndpoints
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>leadbase.network - API danych firm z CEIDG</title>
-  <meta name="description" content="leadbase.network udostępnia dane firm z CEIDG przez API rozliczane tokenami. Wybieraj kolumny, filtruj rekordy i płać za realnie użyte dane.">
+  <title>leadbase.network - europejskie API danych firm</title>
+  <meta name="description" content="leadbase.network udostępnia API danych firm do weryfikacji, segmentacji, wzbogacania CRM i analityki rynku. Polska teraz, kolejne rejestry europejskie w planie.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -516,26 +517,22 @@ public static class LeadbaseSiteEndpoints
       <a href="/docs">Dokumentacja</a>
       <a href="#dashboard">Panel</a>
     </nav>
-    <div class="header-actions">
-      <a class="button button-ghost" href="/swagger">OpenAPI</a>
-      <a class="button button-primary" href="/register">Utwórz konto</a>
-    </div>
+    <div class="header-actions">{{ACCOUNT_LABEL}}<a class="button button-ghost" href="/swagger">OpenAPI</a>{{ACCOUNT_ACTIONS}}</div>
   </header>
 
   <main>
     <section class="hero" id="produkt">
       <div class="hero-copy">
-        <h1>Dane firm z CEIDG przez API rozliczane tokenami</h1>
-        <p>Wyszukuj firmy, wybieraj dokładnie te kolumny, których potrzebujesz, korzystaj ze stronicowanego API i płać tylko za realnie pobrane dane.</p>
+        <h1>Europejska baza firm przez API dla sprzedaży, analiz i automatyzacji</h1>
+        <p>Weryfikuj kontrahentów, segmentuj rynek i wzbogacaj CRM jednym API. Zaczynamy od Polski, a architektura produktu jest gotowa na kolejne rejestry firm z Europy.</p>
         <div class="hero-actions">
-          <a class="button button-primary button-large" href="/register">Utwórz konto</a>
-          <a class="button button-secondary button-large" href="/docs">Dokumentacja</a>
+          {{HERO_ACTIONS}}
         </div>
         <div class="proof-grid" aria-label="Najważniejsze funkcje">
-          <div><strong>Dane z CEIDG</strong><span>lokalny mirror PostgreSQL</span></div>
-          <div><strong>Wybór kolumn</strong><span>niższy koszt zapytań</span></div>
-          <div><strong>Paginacja</strong><span>kontrola dużych wyników</span></div>
-          <div><strong>Tokeny</strong><span>rozliczenie za użycie</span></div>
+          <div><strong>Rejestry firm</strong><span>CEIDG i KRS teraz, Europa w planie</span></div>
+          <div><strong>Elastyczne API</strong><span>wybierasz pola i płacisz za zakres danych</span></div>
+          <div><strong>Wyszukiwanie i analityka</strong><span>firmy, segmenty, trendy i agregaty</span></div>
+          <div><strong>Tokeny</strong><span>czytelny koszt każdego zapytania</span></div>
         </div>
       </div>
 
@@ -574,6 +571,7 @@ public static class LeadbaseSiteEndpoints
       <div class="lab-grid">
         <form class="endpoint-form" id="endpoint-form">
           <label>Nazwa firmy<input name="name" placeholder="np. energia, instalacje, software"></label>
+          <label>Kraj<input name="country" placeholder="np. PL"></label>
           <label>Miasto<input name="city" placeholder="np. Warszawa"></label>
           <label>PKD<input name="mainPkdCode" placeholder="np. 43.21.Z"></label>
           <label>API key dla konta<input name="apiKey" placeholder="Opcjonalnie: ceidg_..."></label>
@@ -681,18 +679,22 @@ public static class LeadbaseSiteEndpoints
     </section>
 
     <section class="dashboard" id="dashboard">
-      <div class="section-head"><h2>Panel użytkownika</h2><p>Kolejny etap produktu: zakup tokenów, historia użycia, klucze API, faktury i limity.</p></div>
-      <div class="dashboard-frame">
-        <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Tokeny i płatności</a><a>Historia użycia</a><a>Klucze API</a><a>Faktury</a></aside>
-        <div class="dash-main">
-          <div class="metrics"><article><span>Dostępne tokeny</span><b>12 450</b></article><article><span>Zużycie miesiąc</span><b>7 550</b></article><article><span>Zapytania</span><b>3 842</b></article><article><span>Błędy</span><b>0.25%</b></article></div>
-          <div class="chart"><i style="height:35%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:85%"></i><i style="height:42%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:55%"></i><i style="height:78%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:88%"></i></div>
+      <div class="section-head"><h2>Panel użytkownika</h2><p>Po zalogowaniu zarządzasz kluczami API, tokenami, jakością danych, importami i historią użycia w jednym panelu.</p></div>
+      <div class="dashboard-frame marketing-dashboard-frame">
+        <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Klucze API</a><a>Tokeny</a><a>Historia użycia</a><a>Jakość danych</a><a>Importy</a><a>Dokumentacja</a></aside>
+        <div class="dash-main marketing-dashboard-main">
+          <div class="metrics"><article><span>Dostępne tokeny</span><b>12 450</b></article><article><span>Aktywne klucze</span><b>5</b></article><article><span>Zapytania API</span><b>3 842</b></article><article><span>Importy OK</span><b>99.7%</b></article></div>
+          <div class="marketing-panel-grid">
+            <section class="marketing-panel-card marketing-panel-wide"><div class="panel-mini-head"><div><h3>Zużycie tokenów</h3><p>Ostatnie 12 dni</p></div><strong>-7 550</strong></div><div class="chart token-usage-chart"><i style="height:35%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:85%"></i><i style="height:42%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:55%"></i><i style="height:78%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:88%"></i></div></section>
+            <section class="marketing-panel-card"><div class="panel-mini-head"><div><h3>Klucze API</h3><p>Widok po kliknięciu menu</p></div><span class="status ok">Aktywne</span></div><div class="api-key-preview-row"><strong>Panel</strong><code>ceidg_33h1fzni7m</code><span>ważny bezterminowo</span></div><div class="api-key-preview-row muted-row"><strong>CRM</strong><code>ceidg_2T5HTSf54t</code><span>ostatnie użycie: dziś</span></div></section>
+            <section class="marketing-panel-card"><div class="panel-mini-head"><div><h3>Tokeny</h3><p>Ostatnie operacje</p></div></div><div class="ledger-preview"><span>Zapytanie do firm</span><b class="negative">-131</b><span>registration_bonus</span><b class="positive">+1 000</b></div></section>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="footer"><span>leadbase.network</span><span>Dane CEIDG przez API. Token billing. PostgreSQL mirror.</span><a href="/terms">Regulamin</a><a href="/privacy">Prywatność</a><a href="/cookies">Cookies</a><a href="/opt-out">Opt-out</a><a href="/docs">Dokumentacja</a><a href="/swagger">Swagger</a></footer>
+  <footer class="footer"><span>leadbase.network</span><span>Europejskie dane firm przez API. Token billing. Wyszukiwanie, weryfikacja i analityka.</span><a href="/terms">Regulamin</a><a href="/privacy">Prywatność</a><a href="/cookies">Cookies</a><a href="/opt-out">Opt-out</a><a href="/docs">Dokumentacja</a><a href="/swagger">Swagger</a></footer>
   <script src="/leadbase.js"></script>
 </body>
 </html>
