@@ -151,7 +151,7 @@ public static class LeadbaseSiteEndpoints
         <section class="panel-section" id="api-keys">
           <div class="panel-section-head"><div><h2>Klucze API</h2><p>Pełny klucz pokazujemy tylko raz po utworzeniu. W bazie przechowujemy hash oraz prefiks.</p></div></div>
           <form class="key-create-form" method="post" action="/app/api-keys">
-            <label>Nazwa klucza <input name="keyName" maxlength="80" placeholder="np. Integracja CRM" autocomplete="off"></label>
+            <label>Nazwa klucza <input name="keyName" maxlength="80" placeholder="np. System fakturowania" autocomplete="off"></label>
             <label>Ważny do <input name="expiresAtLocal" type="datetime-local" autocomplete="off"><span>Opcjonalnie. Puste pole oznacza ważność bezterminową.</span></label>
             <button class="button button-primary" type="submit">Utwórz klucz</button>
           </form>
@@ -496,7 +496,7 @@ public static class LeadbaseSiteEndpoints
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>leadbase.network - europejskie API danych firm</title>
-  <meta name="description" content="leadbase.network udostępnia API danych firm do weryfikacji, segmentacji, wzbogacania CRM i analityki rynku. Polska teraz, kolejne rejestry europejskie w planie.">
+  <meta name="description" content="leadbase.network udostępnia API danych firm do fakturowania, weryfikacji kontrahentów, oceny wiarygodności, analizy rynku i automatyzacji procesów biznesowych. Polska teraz, kolejne rejestry europejskie w planie.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -523,8 +523,8 @@ public static class LeadbaseSiteEndpoints
   <main>
     <section class="hero" id="produkt">
       <div class="hero-copy">
-        <h1>Europejska baza firm przez API dla sprzedaży, analiz i automatyzacji</h1>
-        <p>Weryfikuj kontrahentów, segmentuj rynek i wzbogacaj CRM jednym API. Zaczynamy od Polski, a architektura produktu jest gotowa na kolejne rejestry firm z Europy.</p>
+        <h1>Europejska baza firm przez API do weryfikacji, fakturowania i analiz</h1>
+        <p>Sprawdzaj wiarygodność firm, uzupełniaj dane do faktur, analizuj statusy i historię zmian prawnych oraz automatyzuj procesy biznesowe jednym API.</p>
         <div class="hero-actions">
           {{HERO_ACTIONS}}
         </div>
@@ -620,12 +620,12 @@ public static class LeadbaseSiteEndpoints
 
 
     <section class="steps" id="zastosowania">
-      <div class="section-head"><h2>Do czego używać API?</h2><p>leadbase.network nadaje się zarówno do szybkiej weryfikacji pojedynczej firmy, jak i do budowania procesów sprzedażowych, CRM oraz scoringu B2B.</p></div>
+      <div class="section-head"><h2>Do czego używać API?</h2><p>leadbase.network nadaje się do szybkiej weryfikacji pojedynczej firmy, obsługi programów fakturowania, kontroli wiarygodności kontrahentów oraz analiz zmian w rejestrach.</p></div>
       <div class="step-grid">
-        <article><span>1</span><h3>Weryfikacja po NIP</h3><p>Sprawdź, czy firma istnieje, jest aktywna, zawieszona lub wykreślona przed wystawieniem faktury, podpisaniem umowy albo wysyłką oferty.</p></article>
-        <article><span>2</span><h3>Uzupełnianie CRM</h3><p>Dodawaj nazwę, status, lokalizację i PKD do rekordów leadów bez ręcznego przeszukiwania CEIDG.</p></article>
-        <article><span>3</span><h3>Segmentacja leadów</h3><p>Buduj listy firm po województwie, mieście, statusie, głównym PKD, dacie rozpoczęcia działalności i profilu branżowym.</p></article>
-        <article><span>4</span><h3>Monitoring kontrahentów</h3><p>Automatycznie odświeżaj status działalności i wykrywaj firmy zawieszone, zakończone lub z istotnymi zmianami danych.</p></article>
+        <article><span>1</span><h3>Weryfikacja po NIP</h3><p>Sprawdź, czy firma istnieje, jest aktywna, zawieszona lub wykreślona przed wystawieniem faktury, podpisaniem umowy albo uruchomieniem procesu biznesowego.</p></article>
+        <article><span>2</span><h3>Programy fakturowania</h3><p>Uzupełniaj nazwę, status, adres, NIP, REGON, KRS i PKD bez ręcznego przepisywania danych z rejestrów.</p></article>
+        <article><span>3</span><h3>Analizy i raporty</h3><p>Analizuj firmy po kraju, województwie, mieście, statusie, głównym PKD, dacie rejestracji i formie prawnej.</p></article>
+        <article><span>4</span><h3>Historia zmian prawnych</h3><p>Automatycznie kontroluj status działalności, wpisy historyczne, zawieszenia, wykreślenia i istotne zmiany danych firmowych.</p></article>
       </div>
     </section>
 
@@ -680,14 +680,14 @@ public static class LeadbaseSiteEndpoints
 
     <section class="dashboard" id="dashboard">
       <div class="section-head"><h2>Panel użytkownika</h2><p>Po zalogowaniu zarządzasz kluczami API, tokenami, jakością danych, importami i historią użycia w jednym panelu.</p></div>
-      <div class="dashboard-frame marketing-dashboard-frame">
+      <div class="dashboard-frame product-preview-frame">
         <aside><strong>leadbase</strong><a>Podsumowanie</a><a>Klucze API</a><a>Tokeny</a><a>Historia użycia</a><a>Jakość danych</a><a>Importy</a><a>Dokumentacja</a></aside>
-        <div class="dash-main marketing-dashboard-main">
+        <div class="dash-main product-preview-main">
           <div class="metrics"><article><span>Dostępne tokeny</span><b>12 450</b></article><article><span>Aktywne klucze</span><b>5</b></article><article><span>Zapytania API</span><b>3 842</b></article><article><span>Importy OK</span><b>99.7%</b></article></div>
-          <div class="marketing-panel-grid">
-            <section class="marketing-panel-card marketing-panel-wide"><div class="panel-mini-head"><div><h3>Zużycie tokenów</h3><p>Ostatnie 12 dni</p></div><strong>-7 550</strong></div><div class="chart token-usage-chart"><i style="height:35%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:85%"></i><i style="height:42%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:55%"></i><i style="height:78%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:88%"></i></div></section>
-            <section class="marketing-panel-card"><div class="panel-mini-head"><div><h3>Klucze API</h3><p>Widok po kliknięciu menu</p></div><span class="status ok">Aktywne</span></div><div class="api-key-preview-row"><strong>Panel</strong><code>ceidg_33h1fzni7m</code><span>ważny bezterminowo</span></div><div class="api-key-preview-row muted-row"><strong>CRM</strong><code>ceidg_2T5HTSf54t</code><span>ostatnie użycie: dziś</span></div></section>
-            <section class="marketing-panel-card"><div class="panel-mini-head"><div><h3>Tokeny</h3><p>Ostatnie operacje</p></div></div><div class="ledger-preview"><span>Zapytanie do firm</span><b class="negative">-131</b><span>registration_bonus</span><b class="positive">+1 000</b></div></section>
+          <div class="product-panel-grid">
+            <section class="product-panel-card product-panel-wide"><div class="panel-mini-head"><div><h3>Zużycie tokenów</h3><p>Ostatnie 12 dni</p></div><strong>-7 550</strong></div><div class="chart token-usage-chart"><i style="height:35%"></i><i style="height:70%"></i><i style="height:48%"></i><i style="height:85%"></i><i style="height:42%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:55%"></i><i style="height:78%"></i><i style="height:44%"></i><i style="height:68%"></i><i style="height:88%"></i></div></section>
+            <section class="product-panel-card"><div class="panel-mini-head"><div><h3>Klucze API</h3><p>Widok po kliknięciu menu</p></div><span class="status ok">Aktywne</span></div><div class="api-key-preview-row"><strong>Panel</strong><code>ceidg_33h1fzni7m</code><span>ważny bezterminowo</span></div><div class="api-key-preview-row muted-row"><strong>Fakturowanie</strong><code>ceidg_2T5HTSf54t</code><span>ostatnie użycie: dziś</span></div></section>
+            <section class="product-panel-card"><div class="panel-mini-head"><div><h3>Tokeny</h3><p>Ostatnie operacje</p></div></div><div class="ledger-preview"><span>Zapytanie do firm</span><b class="negative">-131</b><span>registration_bonus</span><b class="positive">+1 000</b></div></section>
           </div>
         </div>
       </div>

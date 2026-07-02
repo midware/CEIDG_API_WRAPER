@@ -1561,29 +1561,29 @@ ul { padding-left: 18px; }
   min-height: 28px;
 }
 
-.marketing-dashboard-frame {
+.product-preview-frame {
   grid-template-columns: 240px minmax(0, 1fr);
 }
 
-.marketing-dashboard-main {
+.product-preview-main {
   padding: 24px;
 }
 
-.marketing-dashboard-main .metrics {
+.product-preview-main .metrics {
   margin: 0;
   padding: 0;
   max-width: none;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.marketing-panel-grid {
+.product-panel-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
   gap: 16px;
   margin-top: 16px;
 }
 
-.marketing-panel-card {
+.product-panel-card {
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--line);
@@ -1591,7 +1591,7 @@ ul { padding-left: 18px; }
   background: #fff;
 }
 
-.marketing-panel-wide {
+.product-panel-wide {
   grid-row: span 2;
 }
 
@@ -1671,20 +1671,20 @@ ul { padding-left: 18px; }
 }
 
 @media (max-width: 1040px) {
-  .marketing-panel-grid,
-  .marketing-dashboard-main .metrics {
+  .product-panel-grid,
+  .product-preview-main .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .marketing-panel-wide {
+  .product-panel-wide {
     grid-row: auto;
     grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 720px) {
-  .marketing-panel-grid,
-  .marketing-dashboard-main .metrics {
+  .product-panel-grid,
+  .product-preview-main .metrics {
     grid-template-columns: 1fr;
   }
 }

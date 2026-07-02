@@ -86,7 +86,7 @@ Content-Type: application/json
 {
   "email": "dev@example.com",
   "password": "bezpieczne-haslo-123",
-  "displayName": "Integracja CRM"
+  "displayName": "System fakturowania"
 }</code></pre>
           </div>
           <div class="docs-card">
